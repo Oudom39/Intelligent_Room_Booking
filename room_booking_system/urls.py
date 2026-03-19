@@ -12,9 +12,15 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('accounts/', include('accounts.urls')),
     path('booking/', include('booking.urls')),  # Booking app integration
-    path('', redirect_to_login), 
-    path('chatbot/', include('chatbot.urls')),  # AI Chatbot (Deepseek-backed)
+    path('', redirect_to_login),
 ]
+
+# Register chatbot URLs only if the chatbot app is installed and importable
+try:
+    import chatbot.urls  # noqa: F401
+    urlpatterns += [path('chatbot/', include('chatbot.urls'))]  # AI Chatbot
+except (ImportError, ModuleNotFoundError):
+    pass
 
 # Serve static and media files in development
 if settings.DEBUG:

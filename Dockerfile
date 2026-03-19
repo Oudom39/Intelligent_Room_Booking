@@ -1,40 +1,36 @@
 FROM python:3.11-slim
 
 # Set environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 # Set work directory
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies (MySQL client libs)
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        postgresql-client \
+        default-libmysqlclient-dev \
         build-essential \
-        libpq-dev \
+        pkg-config \
+        netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
-COPY requirements-production.txt /app/
-RUN pip install --no-cache-dir -r requirements-production.txt
+COPY requirements.txt /app/
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy project
+# Copy project files
 COPY . /app/
 
-# Create static files directory
-RUN mkdir -p /app/staticfiles
+# Create necessary directories
+RUN mkdir -p /app/staticfiles /app/media
 
-# Collect static files
-RUN python manage.py collectstatic --noinput --settings=production_settings
-
-# Create a non-root user
-RUN adduser --disabled-password --gecos '' appuser
-RUN chown -R appuser:appuser /app
-USER appuser
+# Make entrypoint executable
+RUN chmod +x /app/entrypoint.sh
 
 # Expose port
 EXPOSE 8000
 
-# Run gunicorn
-CMD ["gunicorn", "--config", "gunicorn.conf.py", "room_booking_system.wsgi:application"]
+# Run startup script
+ENTRYPOINT ["/app/entrypoint.sh"]
