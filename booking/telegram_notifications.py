@@ -36,16 +36,16 @@ def send_telegram_message(chat_id, message, parse_mode='Markdown'):
     if not TELEGRAM_BOT_TOKEN:
         logger.warning("Telegram bot token not configured")
         return False
-    
+
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    
+
     payload = {
         'chat_id': chat_id,
         'text': message,
         'parse_mode': parse_mode,
         'disable_web_page_preview': True
     }
-    
+
     try:
         response = requests.post(url, json=payload, timeout=10)
         if response.status_code == 200:
@@ -61,23 +61,23 @@ def send_telegram_message(chat_id, message, parse_mode='Markdown'):
 def format_booking_notification(booking, action="created"):
     user = booking.user
     room = booking.room
-    
+
     # Emoji based on action with bright colors
     emoji_map = {
-        'confirmed': '✅', 
-        'cancelled': '🔴', 
+        'confirmed': '✅',
+        'cancelled': '🔴',
     }
-    
+
     action_text = {
         'created': 'New Booking',
         'confirmed': 'Booking Confirmed',
         'cancelled': 'Booking Cancelled',
         'updated': 'Booking Updated'
     }
-    
+
     emoji = emoji_map.get(action, '📋')
     title = action_text.get(action, 'Booking Notification')
-    
+
     # Calculate duration
     duration_hours = int((booking.end_time - booking.start_time).total_seconds() / 3600)
     duration_mins = int(((booking.end_time - booking.start_time).total_seconds() % 3600) / 60)
@@ -85,7 +85,7 @@ def format_booking_notification(booking, action="created"):
         duration_text = f"{duration_hours}h {duration_mins}m"
     else:
         duration_text = f"{duration_hours}h"
-    
+
     message = f"""{emoji} *{title}*
 
 👤 *User*: {user.get_full_name() or user.username}
@@ -112,13 +112,13 @@ def format_booking_notification(booking, action="created"):
 def booking_created_notification(sender, instance, created, **kwargs):
     if not ADMIN_CHAT_IDS:
         return
-    
+
     if created:
         # New booking created
         message = format_booking_notification(instance, "created")
         for chat_id in ADMIN_CHAT_IDS:
             send_telegram_message(chat_id, message)
-    
+
     else:
         # Booking was updated - check if status changed
         try:
@@ -126,14 +126,14 @@ def booking_created_notification(sender, instance, created, **kwargs):
             if hasattr(instance, '_previous_status'):
                 old_status = instance._previous_status
                 new_status = instance.status
-                
+
                 # Notify on status changes to confirmed or cancelled
                 if old_status != new_status and new_status in ['confirmed', 'cancelled']:
                     action = new_status
                     message = format_booking_notification(instance, action)
                     for chat_id in ADMIN_CHAT_IDS:
                         send_telegram_message(chat_id, message)
-                        
+
         except Exception as e:
             logger.error(f"Error checking booking status change: {e}")
 

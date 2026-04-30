@@ -13,13 +13,13 @@ def install_requirements():
     print("📦 Installing Analytics Dashboard Dependencies")
     print("=" * 60)
     print()
-    
+
     packages = [
         "streamlit>=1.28.0",
-        "pandas>=2.0.0", 
+        "pandas>=2.0.0",
         "plotly>=5.17.0"
     ]
-    
+
     for package in packages:
         print(f"Installing {package}...")
         try:
@@ -28,7 +28,7 @@ def install_requirements():
         except subprocess.CalledProcessError as e:
             print(f"❌ Error installing {package}: {e}\n")
             return False
-    
+
     return True
 
 def check_django_setup():
@@ -37,21 +37,21 @@ def check_django_setup():
     print("🔍 Checking Django Configuration")
     print("=" * 60)
     print()
-    
+
     try:
         os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'room_booking_system.settings')
         import django
         django.setup()
-        
+
         from booking.models import Room, Booking
-        
+
         room_count = Room.objects.count()
         booking_count = Booking.objects.count()
-        
-        print(f"✅ Django configured successfully")
+
+        print("✅ Django configured successfully")
         print(f"📊 Found {room_count} rooms and {booking_count} bookings\n")
         return True
-        
+
     except Exception as e:
         print(f"❌ Django setup error: {e}\n")
         return False
@@ -65,7 +65,7 @@ def run_dashboard():
     print("Dashboard will open in your browser at: http://localhost:8501")
     print("Press Ctrl+C to stop the server")
     print()
-    
+
     subprocess.call([sys.executable, "-m", "streamlit", "run", "dashboard_analytics.py"])
 
 def main():
@@ -73,13 +73,13 @@ def main():
     print("🎯 Room Booking Analytics Dashboard Setup")
     print("=" * 60)
     print()
-    
+
     # Step 1: Install dependencies
     print("Step 1: Installing dependencies...")
     if not install_requirements():
         print("\n❌ Installation failed. Please check errors above.")
         return
-    
+
     # Step 2: Check Django
     print("Step 2: Checking Django setup...")
     if not check_django_setup():
@@ -88,11 +88,11 @@ def main():
         response = input("\nContinue anyway? (y/n): ")
         if response.lower() != 'y':
             return
-    
+
     # Step 3: Run dashboard
     print("\n✅ All checks passed!")
     response = input("\nStart the dashboard now? (y/n): ")
-    
+
     if response.lower() == 'y':
         run_dashboard()
     else:

@@ -8,4 +8,3 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS('Successfully set up user groups and permissions')
         )
-        

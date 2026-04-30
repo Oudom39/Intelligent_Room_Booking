@@ -6,10 +6,10 @@ class CustomUserAdmin(UserAdmin):
     model = User
     list_display = ('email', 'student_id', 'faculty', 'department', 'booking_approval_status', 'is_superuser', 'is_active')
     list_filter = ('is_superuser', 'is_active', 'booking_approval_status', 'faculty')
-    
+
     # Disable bulk actions but keep individual actions
-    actions = []  
-    
+    actions = []
+
     fieldsets = (
     (None, {'fields': ('email', 'password')}),
     ('Personal Info', {'fields': ('first_name', 'last_name', 'student_id', 'phone_number', 'faculty', 'department', 'profile_picture')}),

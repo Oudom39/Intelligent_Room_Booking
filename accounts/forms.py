@@ -7,7 +7,7 @@ User = get_user_model()
 
 class CustomUserCreationForm(UserCreationForm):
     """Custom user registration form that matches your HTML frontend"""
-    
+
     first_name = forms.CharField(
         max_length=30,
         required=True,
@@ -17,7 +17,7 @@ class CustomUserCreationForm(UserCreationForm):
             'id': 'firstName'
         })
     )
-    
+
     last_name = forms.CharField(
         max_length=30,
         required=True,
@@ -27,7 +27,7 @@ class CustomUserCreationForm(UserCreationForm):
             'id': 'lastName'
         })
     )
-    
+
     email = forms.EmailField(
         required=True,
         widget=forms.EmailInput(attrs={
@@ -36,7 +36,7 @@ class CustomUserCreationForm(UserCreationForm):
             'id': 'email'
         })
     )
-    
+
     student_id = forms.CharField(
         max_length=20,
         required=False,  # Make optional for flexibility
@@ -56,7 +56,7 @@ class CustomUserCreationForm(UserCreationForm):
             'id': 'phoneNumber'
         })
     )
-    
+
     faculty = forms.CharField(
         max_length=100,
         required=False,
@@ -66,7 +66,7 @@ class CustomUserCreationForm(UserCreationForm):
             'id': 'faculty'
         })
     )
-    
+
     department = forms.CharField(
         max_length=100,
         required=False,
@@ -76,7 +76,7 @@ class CustomUserCreationForm(UserCreationForm):
             'id': 'department'
         })
     )
-    
+
     password1 = forms.CharField(
         widget=forms.PasswordInput(attrs={
             'class': 'form-control',
@@ -84,7 +84,7 @@ class CustomUserCreationForm(UserCreationForm):
             'id': 'password'
         })
     )
-    
+
     password2 = forms.CharField(
         widget=forms.PasswordInput(attrs={
             'class': 'form-control',
@@ -92,23 +92,23 @@ class CustomUserCreationForm(UserCreationForm):
             'id': 'confirmPassword'
         })
     )
-    
+
     class Meta:
         model = User
         fields = ('first_name', 'last_name', 'email', 'student_id', 'phone_number', 'faculty', 'department')
-    
+
     def clean_email(self):
         email = self.cleaned_data.get('email')
         if User.objects.filter(email=email).exists():
             raise forms.ValidationError("A user with this email already exists.")
         return email
-    
+
     def clean_student_id(self):
         student_id = self.cleaned_data.get('student_id')
         if student_id and User.objects.filter(student_id=student_id).exists():
             raise forms.ValidationError("This lecturer ID is already registered.")
         return student_id
-    
+
     def save(self, commit=True):
         user = super().save(commit=False)
         user.email = self.cleaned_data['email']
@@ -118,23 +118,23 @@ class CustomUserCreationForm(UserCreationForm):
         user.phone_number = self.cleaned_data.get('phone_number') or "000-000-0000"
         user.faculty = self.cleaned_data.get('faculty', '')
         user.department = self.cleaned_data.get('department', '')
-        
+
         if commit:
             user.save()
         return user
 
 class CustomLoginForm(forms.Form):
     """Custom login form that matches your HTML frontend"""
-    
+
     email = forms.EmailField(
         widget=forms.EmailInput(attrs={
             'class': 'form-control',
             'placeholder': 'Email Address',
-            'id': 'username',  
-            'name': 'username' 
+            'id': 'username',
+            'name': 'username'
         })
     )
-    
+
     password = forms.CharField(
         widget=forms.PasswordInput(attrs={
             'class': 'form-control',
@@ -145,7 +145,7 @@ class CustomLoginForm(forms.Form):
 # this code is for the password change form
 class CustomPasswordChangeForm(PasswordChangeForm):
     """Custom password change form with your styling"""
-    
+
     old_password = forms.CharField(
         widget=forms.PasswordInput(attrs={
             'class': 'form-control',
@@ -153,7 +153,7 @@ class CustomPasswordChangeForm(PasswordChangeForm):
             'id': 'currentPassword'
         })
     )
-    
+
     new_password1 = forms.CharField(
         widget=forms.PasswordInput(attrs={
             'class': 'form-control',
@@ -161,7 +161,7 @@ class CustomPasswordChangeForm(PasswordChangeForm):
             'id': 'newPassword'
         })
     )
-    
+
     new_password2 = forms.CharField(
         widget=forms.PasswordInput(attrs={
             'class': 'form-control',
@@ -172,7 +172,7 @@ class CustomPasswordChangeForm(PasswordChangeForm):
 
 class UserUpdateForm(forms.ModelForm):
     """Form for updating user profile - Works for both regular users and Google OAuth users"""
-    
+
     profile_picture = forms.ImageField(
         required=False,
         widget=forms.FileInput(attrs={
@@ -229,7 +229,7 @@ class UserUpdateForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        
+
         # Make fields more user-friendly for Google users
         if self.instance and hasattr(self.instance, 'socialaccount_set') and self.instance.socialaccount_set.exists():
             # This is a Google user - customize form
@@ -237,13 +237,13 @@ class UserUpdateForm(forms.ModelForm):
             self.fields['phone_number'].help_text = 'Optional - Add your phone number for better communication'
             self.fields['faculty'].help_text = 'Optional - Select your faculty if applicable'
             self.fields['department'].help_text = 'Optional - Enter your department or program'
-            
+
             # Make student_id not required for Google users if it's auto-generated
             if self.instance.student_id and self.instance.student_id.startswith('GOOGLE'):
                 self.fields['student_id'].required = False
                 self.fields['student_id'].widget.attrs['placeholder'] = 'Lecturer ID (optional for Google users)'
-        
-        
+
+
 
     def clean_email(self):
         """Email cannot be changed for security reasons"""
@@ -251,10 +251,10 @@ class UserUpdateForm(forms.ModelForm):
 
     def clean_student_id(self):
         student_id = self.cleaned_data.get('student_id')
-        
+
         # Handle empty or None student_id
         if not student_id:
-            # If no student_id provided, keep the existing one 
+            # If no student_id provided, keep the existing one
             if self.instance.student_id:
                 return self.instance.student_id
             else:
@@ -263,19 +263,19 @@ class UserUpdateForm(forms.ModelForm):
 
             # Normalize lecturer ID - remove spaces and convert to uppercase
         student_id = student_id.replace(' ', '').upper()
-        
+
         # Only check for duplicates if changed and not empty
         if student_id != self.instance.student_id:
             qs = User.objects.filter(student_id=student_id).exclude(pk=self.instance.pk)
             if qs.exists():
                 raise forms.ValidationError("This lecturer ID is already registered.")
-                
+
         # Validate format only if not auto-generated ID
         if not student_id.startswith(('GOOGLE', 'USR')):
             import re
             if not re.match(r'^[A-Z0-9]{6,20}$', student_id):
                 raise forms.ValidationError("Lecturer ID must be 6-20 characters (letters and numbers only)")
-        
+
         return student_id
 
     def clean_phone_number(self):
@@ -344,12 +344,12 @@ class UserUpdateForm(forms.ModelForm):
     def save(self, commit=True):
         user = super().save(commit=False)
         clear_requested = str(self.data.get('clear_profile_picture', '0')).lower() in {'1', 'true', 'on', 'yes'}
-        
+
         # Debug logging
         import logging
         logger = logging.getLogger(__name__)
         logger.info(f"Updating profile for user: {user.email}")
-        
+
         # Update all fields from cleaned data
         for field in ['first_name', 'last_name', 'student_id', 'phone_number', 'faculty', 'department']:
             value = self.cleaned_data.get(field)
@@ -364,7 +364,7 @@ class UserUpdateForm(forms.ModelForm):
                     setattr(user, field, '')
                     logger.info(f"Set {field} to empty string")
 
-        
+
         # Email is read-only, do not update
         # Handle profile picture
         profile_picture = self.cleaned_data.get('profile_picture')
@@ -376,7 +376,7 @@ class UserUpdateForm(forms.ModelForm):
         elif self.fields['profile_picture'].required is False and not profile_picture and self.instance.profile_picture:
             # If no new image uploaded, keep the old one
             user.profile_picture = self.instance.profile_picture
-            
+
         if commit:
             try:
                 user.save()

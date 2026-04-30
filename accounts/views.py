@@ -117,7 +117,7 @@ def get_user_role(user):
     """Return 'Admin' if user is in Admin group, else 'User'."""
     if not user.is_authenticated:
         return 'Unauthenticated'
-    
+
     if user.groups.filter(name='Admin').exists():
         return 'Admin'
     elif user.groups.filter(name='User').exists():
@@ -278,12 +278,12 @@ def admin_required(view_func):
         if not request.user.is_authenticated:
             messages.error(request, 'Please login to access this page.')
             return redirect('accounts:login')
-        
+
         user_role = get_user_role(request.user)
         if user_role != 'Admin':
             messages.error(request, 'Access denied. Admin privileges required.')
             return redirect('accounts:user_dashboard')
-        
+
         return view_func(request, *args, **kwargs)
     return wrapper
 
@@ -294,12 +294,12 @@ def user_required(view_func):
         if not request.user.is_authenticated:
             messages.error(request, 'Please login to access this page.')
             return redirect('accounts:login')
-        
+
         user_role = get_user_role(request.user)
         if user_role == 'Admin':
             messages.info(request, 'Redirecting to admin dashboard.')
             return redirect('accounts:admin_dashboard')
-        
+
         return view_func(request, *args, **kwargs)
     return wrapper
 
@@ -310,7 +310,7 @@ def role_redirect(view_func):
         if not request.user.is_authenticated:
             messages.error(request, 'Please login to access this page.')
             return redirect('accounts:login')
-        
+
         user_role = get_user_role(request.user)
         if user_role == 'Admin':
             return redirect('accounts:admin_dashboard')
@@ -338,20 +338,20 @@ def register(request):
             confirm_password = request.POST.get('confirmPassword', '')
             student_id = request.POST.get('studentId', '').strip()
             phone_number = request.POST.get('phoneNumber', '').strip()
-            
+
             # Basic validation
             if not all([first_name, last_name, email, password, confirm_password]):
                 messages.error(request, 'Please fill in all required fields.')
                 return render(request, 'SignIn-RegisterPage/register.html')
-            
+
             if password != confirm_password:
                 messages.error(request, 'Passwords do not match.')
                 return render(request, 'SignIn-RegisterPage/register.html')
-            
+
             if User.objects.filter(email=email).exists():
                 messages.error(request, 'A user with this email already exists.')
                 return render(request, 'SignIn-RegisterPage/register.html')
-            
+
             # Create user with flexible fields
             user = User.objects.create_user(
                 email=email,
@@ -364,20 +364,20 @@ def register(request):
                 department=department,
                 booking_approval_status='pending'
             )
-            
+
             # Setup user role
             from django.contrib.auth.models import Group
             user_group, created = Group.objects.get_or_create(name='User')
             user.groups.add(user_group)
-            
+
             messages.success(request, 'Registration successful! You can now log in.')
             return redirect('accounts:login')
-            
+
         except Exception as e:
             print(f"Registration error: {e}")
             messages.error(request, f'Registration failed: {str(e)}')
             return render(request, 'SignIn-RegisterPage/register.html')
-    
+
     return render(request, 'SignIn-RegisterPage/register.html')
 
 def custom_login_view(request):
@@ -389,11 +389,16 @@ def custom_login_view(request):
 
         print(f"Login attempt for: {email} as {selected_role}")
 
-        # Try authenticating with `username` first (ModelBackend expects this),
-        # then fall back to `email` for backends that accept it (e.g. allauth).
-        user = authenticate(request, username=email, password=password)
-        if user is None:
+        # Prefer email-based authentication for custom user models that
+        # use `email` as the `USERNAME_FIELD`. Fall back to username-based
+        # authentication only if the model's USERNAME_FIELD isn't `email`.
+        username_field = getattr(User, 'USERNAME_FIELD', 'username')
+        if username_field == 'email':
             user = authenticate(request, email=email, password=password)
+        else:
+            user = authenticate(request, username=email, password=password)
+            if user is None:
+                user = authenticate(request, email=email, password=password)
         if user is not None:
             # Check group membership
             from django.contrib.auth.models import Group
@@ -440,11 +445,11 @@ def custom_logout_view(request):
 def user_dashboard_view(request):
     """User dashboard - UserPage/featureRoom.html"""
     user_role = get_user_role(request.user)
-    
+
     # Show all rooms (available and unavailable) in featureRoom.html
-    from booking.models import Room, Announcement
+    from booking.models import Room
     from django.utils import timezone
-    
+
     rooms = Room.objects.all().order_by('room_number')
     # Convert rooms to format expected by frontend
     rooms_data = []
@@ -464,22 +469,22 @@ def user_dashboard_view(request):
             'image_url': room.image.url if getattr(room, 'image', None) else '',
             'equipment': room.equipment or '',
         })
-    
+
     # Get active announcements for users
     announcements = Announcement.objects.filter(
         is_active=True
     ).filter(
         Q(show_until__isnull=True) | Q(show_until__gte=timezone.now())
     ).order_by('-priority', '-created_at')[:5]  # Show top 5 announcements
-    
+
     context = {
         'user': request.user,
         'user_role': user_role,
         'full_name': f"{request.user.first_name} {request.user.last_name}",
-        'rooms_data': rooms_data,  
-        'announcements': announcements,  
+        'rooms_data': rooms_data,
+        'announcements': announcements,
     }
-    
+
     return render(request, 'UserPage/featureRoom.html', context)
 
 @login_required
@@ -487,15 +492,15 @@ def user_dashboard_view(request):
 def booking_view(request):
     """Room booking - UserPage/booking.html - Integration with booking app"""
     user_role = get_user_role(request.user)
-    
+
     # Get URL parameters for autofill
     room_id = request.GET.get('room_id')
     date_param = request.GET.get('date')
     time_param = request.GET.get('time')
-    
+
     # Import booking models
     from booking.models import Room, Booking
-    
+
     # Show all rooms so users can see status, including unavailable rooms.
     rooms = Room.objects.all().order_by('room_number')
 
@@ -536,10 +541,9 @@ def booking_view(request):
         status__in=['confirmed']
     ).count()
 
-    # can_book_today = daily_bookings < 3  
+    # can_book_today = daily_bookings < 3
 
     # Get active announcements for users
-    from booking.models import Announcement
     announcements = Announcement.objects.filter(
         is_active=True
     ).filter(
@@ -560,7 +564,7 @@ def booking_view(request):
         # 'can_book_today': can_book_today,
         'daily_bookings': daily_bookings,
         # 'max_daily_bookings': 3,
-        'announcements': announcements, 
+        'announcements': announcements,
 
         # Autofill parameters
         'selected_room': selected_room,
@@ -584,7 +588,7 @@ def booking_view(request):
     }
 
     return render(request, 'UserPage/booking.html', context)
-    
+
 # ============================================================================
 # USER VIEWS (All UserPage Templates) - FOR ADMINS
 # ============================================================================
@@ -594,7 +598,7 @@ def booking_view(request):
 def admin_view_rooms_view(request):
     """View all rooms - AdminPage/viewRooms.html (For admins only)"""
     user_role = get_user_role(request.user)
-    
+
     # Get all rooms for admin
     from booking.models import Room
     rooms = Room.objects.all().order_by('room_number')
@@ -651,7 +655,7 @@ def admin_view_rooms_view(request):
         if room_type not in room_types_dict:
             room_types_dict[room_type] = []
         room_types_dict[room_type].append(room)
-    
+
     context = {
         'user': request.user,
         'user_role': user_role,
@@ -671,16 +675,16 @@ def admin_view_rooms_view(request):
 def create_booking(request):
     """Handle booking creation with university policy validation."""
     user_role = get_user_role(request.user)
-    
+
     if user_role == 'Admin':
         return redirect('accounts:admin_dashboard')
-    
+
     if request.method == 'POST':
         try:
             from booking.models import Room, Booking
             from datetime import datetime
             from django.utils import timezone
-            
+
             # Get form data
             room_id = request.POST.get('room')
             date_str = request.POST.get('date')
@@ -690,7 +694,7 @@ def create_booking(request):
             attendees = request.POST.get('attendees', 1)
             notes = request.POST.get('notes', '').strip()
             agreed_to_policy = request.POST.get('policy_agreement') == 'on'
-            
+
             # Basic validation
             if not all([room_id, date_str, start_time_str, end_time_str, purpose]):
                 messages.error(request, 'Please fill in all required fields.')
@@ -716,7 +720,7 @@ def create_booking(request):
                     'Please complete your verification profile and wait for approval.'
                 )
                 return redirect('accounts:booking')
-            
+
             # Parse and validate date and time
             try:
                 booking_date = datetime.strptime(date_str, '%Y-%m-%d').date()
@@ -725,11 +729,11 @@ def create_booking(request):
             except ValueError:
                 messages.error(request, 'Invalid date or time format.')
                 return redirect('accounts:booking')
-            
+
             # Create timezone-aware datetime objects
             start_datetime = timezone.make_aware(datetime.combine(booking_date, start_time))
             end_datetime = timezone.make_aware(datetime.combine(booking_date, end_time))
-            
+
             # Policy: cannot book in the past and must be at least 1 hour in advance
             now = timezone.now()
             if start_datetime <= now + timezone.timedelta(hours=1):
@@ -756,20 +760,20 @@ def create_booking(request):
             if duration_hours < BOOKING_MIN_DURATION_HOURS:
                 messages.error(request, f'Minimum booking duration per session is {BOOKING_MIN_DURATION_HOURS} hour.')
                 return redirect('accounts:booking')
-            
+
             # Get room and validate
             try:
                 room = Room.objects.get(id=room_id)
             except Room.DoesNotExist:
                 messages.error(request, 'Selected room does not exist.')
                 return redirect('accounts:booking')
-            
+
             effective_status = room.get_current_status(start_datetime) if hasattr(room, 'get_current_status') else getattr(room, 'availability_status', 'available')
             if effective_status != 'available':
                 display_status = 'maintenance' if effective_status == 'unavailable' else effective_status
                 messages.error(request, f'This room is currently {display_status} for the selected time.')
                 return redirect('accounts:booking')
-            
+
             # Validate attendees count
             try:
                 attendees_count = int(attendees)
@@ -787,7 +791,7 @@ def create_booking(request):
             except (ValueError, TypeError):
                 messages.error(request, 'Invalid number of attendees.')
                 return redirect('accounts:booking')
-            
+
             # Policy: user cannot book multiple rooms at the same time slot
             overlapping_user_bookings = Booking.objects.filter(
                 user=request.user,
@@ -815,7 +819,7 @@ def create_booking(request):
                     'This time is marked as occupied by admin schedule rules for this room.'
                 )
                 return redirect('accounts:booking')
-            
+
             if conflicts.exists():
                 conflict_booking = conflicts.first()
                 conflict_time = conflict_booking.start_time.strftime('%Y-%m-%d %H:%M')
@@ -847,7 +851,7 @@ def create_booking(request):
             if not can_book_consecutively:
                 messages.error(request, consecutive_error)
                 return redirect('accounts:booking')
-            
+
             # Create booking
             booking = Booking.objects.create(
                 user=request.user,
@@ -860,41 +864,41 @@ def create_booking(request):
                 agreed_to_room_policy=True,
                 status='confirmed'
             )
-            
+
             # Check if this is a redirect from user dashboard
             referrer = request.META.get('HTTP_REFERER', '')
-            from_dashboard = ('user-dashboard' in referrer or 
-                            'featureRoom' in referrer or 
+            from_dashboard = ('user-dashboard' in referrer or
+                            'featureRoom' in referrer or
                             request.GET.get('from_dashboard') == 'true')
-            
+
             # Success message with booking details (only if not from dashboard)
             if not from_dashboard:
                 booking_time = start_datetime.strftime('%Y-%m-%d at %H:%M')
 
-                messages.success(request, 
+                messages.success(request,
                     f'Room booked successfully! '
                     f'Room: {room.name} ({room.room_number}) | '
                     f'Date: {booking_time} | '
                     f'Duration: {duration_hours:.1f} hours | '
                     f'Status: Confirmed'
                 )
-            
+
             return redirect('accounts:booked')
-            
+
         except Exception as e:
             messages.error(request, f'Booking failed: {str(e)}')
             return redirect('accounts:booking')
-    
+
     return redirect('accounts:booking')
 
 @login_required
 def create_booking_redirect(request):
     """Redirect booking creation to booking app"""
     user_role = get_user_role(request.user)
-    
+
     if user_role == 'Admin':
         return redirect('accounts:admin_dashboard')
-    
+
     # Redirect to booking app's create_booking view
     return redirect('booking:create_booking')
 
@@ -907,15 +911,15 @@ def create_booking_redirect(request):
 def setting_view(request):
     """User settings - UserPage/setting.html"""
     user_role = get_user_role(request.user)
-    
+
     # Refresh user from database to get latest data
     request.user.refresh_from_db()
-    
+
     context = {
         'user': request.user,
         'user_role': user_role,
     }
-    
+
     return render(request, 'UserPage/setting.html', context)
 
 
@@ -924,11 +928,10 @@ def setting_view(request):
 def profile_setting_view(request):
     """Edit user profile - UserPage/profileSetting.html - Enhanced for Google OAuth users"""
     user_role = get_user_role(request.user)
-    
+
     # Check if this is a Google user
     is_google_user = hasattr(request.user, 'socialaccount_set') and request.user.socialaccount_set.filter(provider='google').exists()
-    
-    from accounts.forms import UserUpdateForm
+
     if request.method == 'POST':
         # AJAX delete profile picture
         if request.headers.get('x-requested-with') == 'XMLHttpRequest' and request.POST.get('action') == 'delete_profile_picture':
@@ -950,23 +953,23 @@ def profile_setting_view(request):
                     import logging
                     logger = logging.getLogger(__name__)
                     logger.info(f"Form data before save: {form.cleaned_data}")
-                    
+
                     user = form.save()
-                    
+
                     # Refresh user instance from database to ensure latest data
                     user.refresh_from_db()
-                    
+
                     # Log user data after saving
                     logger.info(f"User data after save - Faculty: '{user.faculty}', Department: '{user.department}'")
-                    
+
                     pic_url = user.profile_picture.url if user.profile_picture else 'https://via.placeholder.com/300x300/4a90e2/ffffff?text=Profile'
-                    
+
                     # Enhanced success message for Google users
                     if is_google_user:
                         success_msg = 'Profile updated successfully! Your Google account is now fully customized.'
                     else:
                         success_msg = 'Profile updated successfully!'
-                        
+
                     return JsonResponse({
                         'success': True,
                         'message': success_msg,
@@ -978,7 +981,7 @@ def profile_setting_view(request):
                     })
                 except Exception as e:
                     return JsonResponse({
-                        'success': False, 
+                        'success': False,
                         'message': f'Save failed: {str(e)}',
                         'errors': {'__all__': [str(e)]}
                     })
@@ -991,9 +994,9 @@ def profile_setting_view(request):
                             error_messages.append(error)
                         else:
                             error_messages.append(f"{field.replace('_', ' ').title()}: {error}")
-                
+
                 return JsonResponse({
-                    'success': False, 
+                    'success': False,
                     'message': 'Please correct the following errors: ' + '; '.join(error_messages),
                     'errors': form.errors.as_json()
                 })
@@ -1003,7 +1006,7 @@ def profile_setting_view(request):
             if form.is_valid():
                 try:
                     form.save()
-                    
+
                     # Enhanced success message for Google users
                     if is_google_user:
                         messages.success(request, 'Profile updated successfully! Your Google account information has been customized.')
@@ -1023,7 +1026,7 @@ def profile_setting_view(request):
                             messages.error(request, f"{field_name}: {error}")
     else:
         form = UserUpdateForm(instance=request.user)
-        
+
         # Add helpful message for new Google users
         if is_google_user and (
             not request.user.phone_number
@@ -1031,7 +1034,7 @@ def profile_setting_view(request):
             or (request.user.student_id or '').startswith('GOOGLE')
         ):
             messages.info(request, 'Complete your profile! You can add your lecturer ID, phone number, faculty, and other details to personalize your account.')
-    
+
     context = {
         'user': request.user,
         'user_role': user_role,
@@ -1045,12 +1048,12 @@ def profile_setting_view(request):
 def about_us_view(request):
     """About us - UserPage/about-us.html"""
     user_role = get_user_role(request.user)
-    
+
     context = {
         'user': request.user,
         'user_role': user_role,
     }
-    
+
     return render(request, 'UserPage/about-us.html', context)
 
 
@@ -1107,17 +1110,17 @@ def service_view(request):
 def admin_dashboard_view(request):
     """Admin dashboard - AdminPage/adminHomePage.html"""
     user_role = get_user_role(request.user)
-    
+
     # Get admin statistics
     total_users = User.objects.count()
     admin_count = User.objects.filter(groups__name='Admin').count()
     user_count = User.objects.filter(groups__name='User').count()
-    
+
     # Get booking statistics
     total_bookings = Booking.objects.count()
     confirmed_bookings = Booking.objects.filter(status='confirmed').count()
     total_rooms = Room.objects.count()
-    
+
     context = {
         'user': request.user,
         'user_role': user_role,
@@ -1128,21 +1131,21 @@ def admin_dashboard_view(request):
         'confirmed_bookings': confirmed_bookings,
         'total_rooms': total_rooms,
     }
-    
+
     return render(request, 'AdminPage/adminHomePage.html', context)
 
 @login_required
 @admin_required
 def manage_rooms_view(request):
     user_role = get_user_role(request.user)
-    
+
     # Handle room management
     if request.method == 'POST':
         try:
             from booking.models import Room, RoomOccupiedTimeRule
-            
+
             action = request.POST.get('action')
-            
+
             if action == 'add_room':
                 # Add room logic
                 room_name = request.POST.get('room_name')
@@ -1157,7 +1160,7 @@ def manage_rooms_view(request):
                 availability_status = request.POST.get('availability_status', 'available')
                 is_available = request.POST.get('is_available', 'on') == 'on'
                 auto_status_updates = request.POST.get('auto_status_updates', 'on') == 'on'
-                
+
                 if room_name and room_number and room_type and capacity:
                     # Room number duplicates are now allowed
                     room_data = {
@@ -1173,15 +1176,15 @@ def manage_rooms_view(request):
                         'availability_status': availability_status,
                         'auto_status_updates': auto_status_updates,
                     }
-                    
+
                     if room_image:
                         room_data['image'] = room_image
-                        
+
                     Room.objects.create(**room_data)
                     messages.success(request, f'Room "{room_name}" added successfully!')
                 else:
                     messages.error(request, 'Please fill in all required fields.')
-                
+
             elif action == 'edit_room':
                 # Edit room logic
                 room_id = request.POST.get('room_id')
@@ -1197,11 +1200,11 @@ def manage_rooms_view(request):
                 availability_status = request.POST.get('availability_status', 'available')
                 is_available = request.POST.get('is_available', 'on') == 'on'
                 auto_status_updates = request.POST.get('auto_status_updates', 'on') == 'on'
-                
+
                 if room_id and room_name and room_number and room_type and capacity:
                     try:
                         room = Room.objects.get(id=room_id)
-                        
+
                         room.name = room_name
                         room.room_number = room_number
                         room.room_type = room_type
@@ -1213,11 +1216,11 @@ def manage_rooms_view(request):
                         room.is_available = is_available
                         room.availability_status = availability_status
                         room.auto_status_updates = auto_status_updates
-                        
+
                         # Update image if provided
                         if room_image:
                             room.image = room_image
-                            
+
                         room.save()
                         messages.success(request, f'Room "{room_name}" updated successfully!')
                     except Room.DoesNotExist:
@@ -1226,7 +1229,7 @@ def manage_rooms_view(request):
                         messages.error(request, 'Invalid capacity value. Please enter a number.')
                 else:
                     messages.error(request, 'Please fill in all required fields.')
-                
+
             elif action == 'delete_room':
                 # Delete room logic
                 room_id = request.POST.get('room_id')
@@ -1234,13 +1237,13 @@ def manage_rooms_view(request):
                     try:
                         room = Room.objects.get(id=room_id)
                         room_name = room.name
-                        
+
                         # Check if room has active bookings
                         active_bookings = room.bookings.filter(
                             status__in=['confirmed'],
                             start_time__gte=timezone.now()
                         )
-                        
+
                         if active_bookings.exists():
                             messages.error(request, f'Cannot delete room "{room_name}". It has active bookings.')
                         else:
@@ -1248,7 +1251,7 @@ def manage_rooms_view(request):
                             messages.success(request, f'Room "{room_name}" deleted successfully!')
                     except Room.DoesNotExist:
                         messages.error(request, 'Room not found.')
-                        
+
             elif action == 'toggle_availability':
                 # Toggle room availability
                 room_id = request.POST.get('room_id')
@@ -1261,24 +1264,24 @@ def manage_rooms_view(request):
                         messages.success(request, f'Room "{room.name}" is now {status}!')
                     except Room.DoesNotExist:
                         messages.error(request, 'Room not found.')
-                        
+
         except ValueError as e:
             messages.error(request, f'Invalid input: {str(e)}')
         except Exception as e:
             messages.error(request, f'Room management failed: {str(e)}')
-    
+
     # Get rooms data
     from booking.models import Room
     rooms = Room.objects.all().order_by('room_number')
-    
+
     # Get room types for the form
     room_types = Room.ROOM_TYPES
-    
+
     # Get room statistics
     total_rooms = rooms.count()
     available_rooms = rooms.filter(is_available=True).count()
     unavailable_rooms = rooms.filter(is_available=False).count()
-    
+
     # Add search functionality
     search_query = request.GET.get('search', '')
     if search_query:
@@ -1287,12 +1290,12 @@ def manage_rooms_view(request):
             Q(room_number__icontains=search_query) |
             Q(description__icontains=search_query)
         )
-    
+
     # Filter by room type
     room_type_filter = request.GET.get('room_type', '')
     if room_type_filter:
         rooms = rooms.filter(room_type=room_type_filter)
-    
+
     # Filter by availability
     availability_filter = request.GET.get('availability', '')
     if availability_filter:
@@ -1300,7 +1303,7 @@ def manage_rooms_view(request):
             rooms = rooms.filter(is_available=True).exclude(availability_status='unavailable')
         elif availability_filter == 'unavailable':
             rooms = rooms.filter(Q(is_available=False) | Q(availability_status='unavailable'))
-    
+
     context = {
         'user': request.user,
         'user_role': user_role,
@@ -1313,7 +1316,7 @@ def manage_rooms_view(request):
         'selected_room_type': request.GET.get('room_type', ''),
         'selected_availability': request.GET.get('availability', ''),
     }
-    
+
     return render(request, 'AdminPage/admin_room_management.html', context)
 
 
@@ -1329,9 +1332,9 @@ def admin_room_management_view(request):
     if request.method == 'POST':
         try:
             from booking.models import Room
-            
+
             action = request.POST.get('action')
-            
+
             if action == 'add_room':
                 # Add room logic
                 room_name = request.POST.get('room_name')
@@ -1346,7 +1349,7 @@ def admin_room_management_view(request):
                 availability_status = request.POST.get('availability_status', 'available')
                 is_available = request.POST.get('is_available', 'on') == 'on'
                 auto_status_updates = request.POST.get('auto_status_updates', 'on') == 'on'
-                
+
                 if room_name and room_number and room_type and capacity:
                     room_data = {
                         'name': room_name,
@@ -1361,15 +1364,15 @@ def admin_room_management_view(request):
                         'availability_status': availability_status,
                         'auto_status_updates': auto_status_updates,
                     }
-                    
+
                     if room_image:
                         room_data['image'] = room_image
-                        
+
                     Room.objects.create(**room_data)
                     messages.success(request, f'Room "{room_name}" added successfully!')
                 else:
                     messages.error(request, 'Please fill in all required fields.')
-                
+
             elif action == 'edit_room':
                 # Edit room logic
                 room_id = request.POST.get('room_id')
@@ -1385,11 +1388,11 @@ def admin_room_management_view(request):
                 availability_status = request.POST.get('availability_status', 'available')
                 is_available = request.POST.get('is_available', 'on') == 'on'
                 auto_status_updates = request.POST.get('auto_status_updates', 'on') == 'on'
-                
+
                 if room_id and room_name and room_number and room_type and capacity:
                     try:
                         room = Room.objects.get(id=room_id)
-                        
+
                         room.name = room_name
                         room.room_number = room_number
                         room.room_type = room_type
@@ -1401,11 +1404,11 @@ def admin_room_management_view(request):
                         room.is_available = is_available
                         room.availability_status = availability_status
                         room.auto_status_updates = auto_status_updates
-                        
+
                         # Update image if provided
                         if room_image:
                             room.image = room_image
-                            
+
                         room.save()
                         messages.success(request, f'Room "{room_name}" updated successfully!')
                     except Room.DoesNotExist:
@@ -1468,24 +1471,24 @@ def admin_room_management_view(request):
                     messages.success(request, f'Occupied rule removed from room "{room_name}".')
                 except RoomOccupiedTimeRule.DoesNotExist:
                     messages.error(request, 'Occupied rule not found.')
-                    
+
         except ValueError as e:
             messages.error(request, f'Invalid input: {str(e)}')
         except Exception as e:
             messages.error(request, f'Room management failed: {str(e)}')
-    
+
     # Get rooms data
     from booking.models import Room
     rooms = Room.objects.all().prefetch_related('occupied_rules').order_by('room_number')
-    
+
     # Get room types for the form
     room_types = Room.ROOM_TYPES
-    
+
     # Get room statistics
     total_rooms = rooms.count()
     available_rooms = rooms.filter(is_available=True).count()
     unavailable_rooms = rooms.filter(is_available=False).count()
-    
+
     # Add search functionality
     search_query = request.GET.get('search', '')
     if search_query:
@@ -1494,12 +1497,12 @@ def admin_room_management_view(request):
             Q(room_number__icontains=search_query) |
             Q(description__icontains=search_query)
         )
-    
+
     # Filter by room type
     room_type_filter = request.GET.get('room_type', '')
     if room_type_filter:
         rooms = rooms.filter(room_type=room_type_filter)
-    
+
     # Filter by availability
     availability_filter = request.GET.get('availability', '')
     if availability_filter:
@@ -1507,7 +1510,7 @@ def admin_room_management_view(request):
             rooms = rooms.filter(is_available=True).exclude(availability_status='unavailable')
         elif availability_filter == 'unavailable':
             rooms = rooms.filter(Q(is_available=False) | Q(availability_status='unavailable'))
-    
+
     context = {
         'user': request.user,
         'user_role': user_role,
@@ -1520,7 +1523,7 @@ def admin_room_management_view(request):
         'selected_room_type': request.GET.get('room_type', ''),
         'selected_availability': request.GET.get('availability', ''),
     }
-    
+
     return render(request, 'AdminPage/admin_room_management.html', context)
 
 
@@ -1594,15 +1597,15 @@ def add_room_view(request):
 def all_bookings_view(request):
     """All bookings - AdminPage/allBookings.html"""
     user_role = get_user_role(request.user)
-    
+
     # Handle booking actions
     if request.method == 'POST':
         try:
             from booking.models import Booking
-            
+
             action = request.POST.get('action')
             booking_id = request.POST.get('booking_id')
-            
+
             if action and booking_id:
                 booking = Booking.objects.get(id=booking_id)
                 if action == 'approve':
@@ -1617,19 +1620,18 @@ def all_bookings_view(request):
                     booking.status = 'cancelled'
                     booking.save()
                     messages.success(request, f'Booking for {booking.room.name} has been cancelled!')
-                    
+
         except Booking.DoesNotExist:
             messages.error(request, 'Booking not found.')
         except Exception as e:
             messages.error(request, f'Booking action failed: {str(e)}')
-    
+
     # Get all bookings with filtering
     from booking.models import Booking
     from django.utils import timezone
     from datetime import datetime
     import openpyxl
     from openpyxl.utils import get_column_letter
-    from django.http import HttpResponse
 
     bookings = Booking.objects.all().order_by('-start_time')
 
@@ -1651,10 +1653,10 @@ def all_bookings_view(request):
         end_dt = timezone.make_aware(datetime.combine(last_day, time.max))
         print(f"[DEBUG] Filtering for month range: {start_dt} to {end_dt} (timezone-aware)")
         filtered = bookings.filter(start_time__gte=start_dt, start_time__lte=end_dt)
-        print(f"[DEBUG] All bookings start_time (with year/month, tzinfo, compare to today):")
+        print("[DEBUG] All bookings start_time (with year/month, tzinfo, compare to today):")
         for b in bookings:
             print(f"  - {b.start_time} (year={b.start_time.year}, month={b.start_time.month}, tzinfo={b.start_time.tzinfo}) | matches? year: {b.start_time.year == today.year}, month: {b.start_time.month == today.month}")
-        print(f"[DEBUG] Filtered bookings:")
+        print("[DEBUG] Filtered bookings:")
         for b in filtered:
             print(f"  - {b.start_time} (year={b.start_time.year}, month={b.start_time.month}, tzinfo={b.start_time.tzinfo})")
         print(f"[DEBUG] Bookings count before filter: {bookings.count()}")
@@ -1686,14 +1688,14 @@ def all_bookings_view(request):
             # Debug: print all booking start_times and the custom_date
             print(f"[DEBUG] Filtering for custom_date: {custom_date}")
             print(f"[DEBUG] Range: {start_dt} to {end_dt}")
-            print(f"[DEBUG] All bookings start_time:")
+            print("[DEBUG] All bookings start_time:")
             for b in bookings:
                 print(f"  - {b.start_time}")
-            print(f"[DEBUG] Filtered bookings:")
+            print("[DEBUG] Filtered bookings:")
             for b in filtered:
                 print(f"  - {b.start_time}")
             bookings = filtered
-   
+
 
     # Filtering by status
     status = request.GET.get('status', '')
@@ -1764,7 +1766,7 @@ def all_bookings_view(request):
         'active_bookings': active_bookings,
         'confirmed_bookings': confirmed_bookings,
         'cancelled_bookings': cancelled_bookings,
-        'today': today, 
+        'today': today,
     }
     return render(request, 'AdminPage/allBookings.html', context)
 
@@ -1776,13 +1778,13 @@ def admin_setting_view(request):
 
     user_role = get_user_role(request.user)
     form = None
-    
+
     if request.method == 'POST':
         try:
             if request.headers.get('x-requested-with') == 'XMLHttpRequest':
                 data = json.loads(request.body)
                 user = request.user
-                
+
                 # Update user fields
                 if 'first_name' in data:
                     user.first_name = data['first_name']
@@ -1794,10 +1796,10 @@ def admin_setting_view(request):
                     user.department = data['department']
                 if 'phone_number' in data and hasattr(user, 'phone_number'):
                     user.phone_number = data['phone_number']
-                
+
                 # Save the user
                 user.save()
-                
+
                 # Return success response with updated data
                 response_data = {
                     'success': True,
@@ -1812,7 +1814,7 @@ def admin_setting_view(request):
                     }
                 }
                 return JsonResponse(response_data)
-            
+
         except json.JSONDecodeError:
             return JsonResponse({
                 'success': False,
@@ -1852,31 +1854,31 @@ def admin_setting_view(request):
 def manage_users_view(request):
     """Manage users - AdminPage/manageUsers.html"""
     user_role = get_user_role(request.user)
-    
+
     # Handle user management actions
     if request.method == 'POST':
         try:
             action = request.POST.get('action')
             user_id = request.POST.get('user_id')
-            
+
             if action and user_id:
                 target_user = User.objects.get(id=user_id)
-                
+
                 # Prevent users from modifying themselves
                 if target_user.id == request.user.id:
                     messages.error(request, "You cannot modify your own account.")
                     return redirect('accounts:manage_users')
-                
+
                 if action == 'make_admin':
                     target_user.is_admin = True
                     target_user.save()
                     messages.success(request, f'User {target_user.get_full_name()} has been made an admin.')
-                        
+
                 elif action == 'make_user':
                     target_user.is_admin = False
                     target_user.save()
                     messages.success(request, f'User {target_user.get_full_name()} has been made a regular user.')
-                        
+
                 elif action == 'toggle_active':
                     target_user.is_active = not target_user.is_active
                     target_user.save()
@@ -1897,20 +1899,20 @@ def manage_users_view(request):
                     target_user.booking_approval_status = 'pending'
                     target_user.save(update_fields=['booking_approval_status'])
                     messages.success(request, f'Booking access set to pending for {target_user.get_full_name()}.')
-                    
+
         except User.DoesNotExist:
             messages.error(request, 'User not found.')
         except Exception as e:
             messages.error(request, f'User management failed: {str(e)}')
-        
+
         return redirect('accounts:manage_users')
-    
+
     # Get all users
     try:
         all_users = User.objects.all().order_by('-date_joined')
         admin_users = all_users.filter(is_admin=True)
         regular_users = all_users.filter(is_admin=False)
-        
+
         # Calculate statistics
         total_users = all_users.count()
         active_users = all_users.filter(is_active=True).count()
@@ -1919,7 +1921,7 @@ def manage_users_view(request):
         user_count = regular_users.count()
         pending_approval_users = regular_users.filter(booking_approval_status='pending')
         pending_approval_count = pending_approval_users.count()
-        
+
     except Exception as e:
         messages.error(request, f'Error loading users: {str(e)}')
         all_users = []
@@ -1932,7 +1934,7 @@ def manage_users_view(request):
         user_count = 0
         pending_approval_users = []
         pending_approval_count = 0
-    
+
     context = {
         'user': request.user,
         'user_role': user_role,
@@ -1947,7 +1949,7 @@ def manage_users_view(request):
         'pending_approval_users': pending_approval_users,
         'pending_approval_count': pending_approval_count,
     }
-    
+
     return render(request, 'AdminPage/manageUsers.html', context)
 
 @login_required
@@ -1955,7 +1957,7 @@ def manage_users_view(request):
 def admin_room_detail_view(request, room_id):
     """View room details for admin - AdminPage/roomDetail.html"""
     user_role = get_user_role(request.user)
-    
+
     try:
         room = Room.objects.get(id=room_id)
 
@@ -2014,25 +2016,25 @@ def admin_room_detail_view(request, room_id):
                 except RoomOccupiedTimeRule.DoesNotExist:
                     messages.error(request, 'Occupied rule not found.')
                 return redirect('accounts:admin_room_detail', room_id=room.id)
-        
+
         # Get room bookings
         bookings = Booking.objects.filter(room=room).order_by('-start_time')
-        
+
         # Get today's bookings
         today = timezone.now().date()
         today_bookings = bookings.filter(start_time__date=today)
-        
+
         # Get upcoming bookings
         upcoming_bookings = bookings.filter(
             start_time__gt=timezone.now(),
             status__in=['confirmed']
         )[:10]
-        
+
         # Get booking statistics
         total_bookings = bookings.count()
         confirmed_bookings = bookings.filter(status='confirmed').count()
         cancelled_bookings = bookings.filter(status='cancelled').count()
-        
+
         context = {
             'user': request.user,
             'user_role': user_role,
@@ -2046,9 +2048,9 @@ def admin_room_detail_view(request, room_id):
             'occupied_rules': room.occupied_rules.all().order_by('-is_active', 'rule_type', 'start_time'),
             'today_timeline': room.get_status_timeline(today),
         }
-        
+
         return render(request, 'AdminPage/roomDetail.html', context)
-        
+
     except Room.DoesNotExist:
         messages.error(request, 'Room not found.')
         return redirect('accounts:manage_rooms')
@@ -2061,10 +2063,10 @@ def admin_room_detail_view(request, room_id):
 def admin_add_room_view(request):
     """Add new room - AdminPage/addRoom.html"""
     user_role = get_user_role(request.user)
-    
+
     try:
         from booking.models import Room
-        
+
         if request.method == 'POST':
             # Get form data
             room_name = request.POST.get('room_name', '').strip()
@@ -2078,7 +2080,7 @@ def admin_add_room_view(request):
             is_available = request.POST.get('is_available', 'on') == 'on'
             availability_status = request.POST.get('availability_status', 'available')
             auto_status_updates = request.POST.get('auto_status_updates', 'on') == 'on'
-            
+
             # Validation
             if not all([room_name, room_number, room_type, capacity]):
                 messages.error(request, 'Please fill in all required fields.')
@@ -2087,7 +2089,7 @@ def admin_add_room_view(request):
                     'user_role': user_role,
                     'room_types': Room.ROOM_TYPES,
                 })
-            
+
             try:
                 capacity = int(capacity)
                 if capacity <= 0:
@@ -2104,7 +2106,7 @@ def admin_add_room_view(request):
                     'user_role': user_role,
                     'room_types': Room.ROOM_TYPES,
                 })
-            
+
             # Check if room number already exists
             # Create room
             room = Room.objects.create(
@@ -2120,10 +2122,10 @@ def admin_add_room_view(request):
                 availability_status=availability_status,
                 auto_status_updates=auto_status_updates,
             )
-            
+
             messages.success(request, f'Room "{room_name}" ({room_number}) created successfully!')
             return redirect('accounts:manage_rooms')
-        
+
         # GET request - show form
         context = {
             'user': request.user,
@@ -2132,9 +2134,9 @@ def admin_add_room_view(request):
             'action': 'add',
             'room': None,
         }
-        
+
         return render(request, 'AdminPage/admin_room_form.html', context)
-        
+
     except Exception as e:
         messages.error(request, f'Error adding room: {str(e)}')
         return redirect('accounts:manage_rooms')
@@ -2143,11 +2145,11 @@ def admin_add_room_view(request):
 @admin_required
 def admin_edit_room_view(request, room_id):
     user_role = get_user_role(request.user)
-    
+
     try:
         from booking.models import Room
         room = Room.objects.get(id=room_id)
-        
+
         if request.method == 'POST':
             # Get form data
             room_name = request.POST.get('room_name', '').strip()
@@ -2158,11 +2160,11 @@ def admin_edit_room_view(request, room_id):
             max_booking_capacity = request.POST.get('max_booking_capacity') or capacity
             description = request.POST.get('description', '').strip()
             equipment = request.POST.get('equipment', '').strip()
-            room_image = request.FILES.get('room_image')  
+            room_image = request.FILES.get('room_image')
             is_available = request.POST.get('is_available', 'on') == 'on'
             availability_status = request.POST.get('availability_status', 'available')
             auto_status_updates = request.POST.get('auto_status_updates', 'on') == 'on'
-            
+
             # Validation
             if not all([room_name, room_number, room_type, capacity]):
                 messages.error(request, 'Please fill in all required fields.')
@@ -2173,7 +2175,7 @@ def admin_edit_room_view(request, room_id):
                     'room_types': Room.ROOM_TYPES,
                     'action': 'edit'
                 })
-            
+
             try:
                 capacity = int(capacity)
                 if capacity <= 0:
@@ -2194,7 +2196,7 @@ def admin_edit_room_view(request, room_id):
                     'room_types': Room.ROOM_TYPES,
                     'action': 'edit'
                 })
-            
+
             # Update room
             room.name = room_name
             room.room_number = room_number
@@ -2207,16 +2209,16 @@ def admin_edit_room_view(request, room_id):
             room.is_available = is_available
             room.availability_status = availability_status
             room.auto_status_updates = auto_status_updates
-            
+
             # Update image if provided
             if room_image:
                 room.image = room_image
-                
+
             room.save()
-            
+
             messages.success(request, f'Room "{room_name}" ({room_number}) updated successfully!')
             return redirect('accounts:manage_rooms')
-        
+
         # GET request - show form
         context = {
             'user': request.user,
@@ -2225,9 +2227,9 @@ def admin_edit_room_view(request, room_id):
             'room_types': Room.ROOM_TYPES,
             'action': 'edit'
         }
-        
+
         return render(request, 'AdminPage/admin_room_form.html', context)
-        
+
     except Room.DoesNotExist:
         messages.error(request, 'Room not found.')
         return redirect('accounts:manage_rooms')
@@ -2240,11 +2242,11 @@ def admin_edit_room_view(request, room_id):
 def admin_delete_room_view(request, room_id):
     """Delete room - AdminPage/deleteRoom.html"""
     user_role = get_user_role(request.user)
-    
+
     try:
         from booking.models import Room, Booking
         room = Room.objects.get(id=room_id)
-        
+
         if request.method == 'POST':
             # Check if room has active bookings
             active_bookings = Booking.objects.filter(
@@ -2252,19 +2254,19 @@ def admin_delete_room_view(request, room_id):
                 status__in=['confirmed'],
                 start_time__gte=timezone.now()
             )
-            
+
             if active_bookings.exists():
                 messages.error(request, f'Cannot delete room "{room.name}". It has {active_bookings.count()} active booking(s).')
                 return redirect('accounts:manage_rooms')
-            
+
             # Delete room
             room_name = room.name
             room_number = room.room_number
             room.delete()
-            
+
             messages.success(request, f'Room "{room_name}" ({room_number}) deleted successfully!')
             return redirect('accounts:manage_rooms')
-        
+
         # GET request - show confirmation
         # Get room bookings for display
         bookings = Booking.objects.filter(room=room).order_by('-start_time')
@@ -2272,7 +2274,7 @@ def admin_delete_room_view(request, room_id):
             status__in=['confirmed'],
             start_time__gte=timezone.now()
         )
-        
+
         context = {
             'user': request.user,
             'user_role': user_role,
@@ -2281,9 +2283,9 @@ def admin_delete_room_view(request, room_id):
             'active_bookings': active_bookings,
             'has_active_bookings': active_bookings.exists(),
         }
-        
+
         return render(request, 'AdminPage/room_confirm_delete.html', context)
-        
+
     except Room.DoesNotExist:
         messages.error(request, 'Room not found.')
         return redirect('accounts:manage_rooms')
@@ -2303,24 +2305,24 @@ def ajax_toggle_user_status(request, user_id):
     if request.method == 'POST':
         try:
             target_user = User.objects.get(id=user_id)
-            
+
             # Prevent admin from deactivating themselves
             if target_user == request.user:
                 if request.headers.get('Content-Type') == 'application/json':
                     return JsonResponse({
-                        'success': False, 
+                        'success': False,
                         'error': 'You cannot deactivate your own account.'
                     })
                 else:
                     messages.error(request, 'You cannot deactivate your own account.')
                     return redirect('accounts:manage_users')
-            
+
             # Toggle active status
             target_user.is_active = not target_user.is_active
             target_user.save()
-            
+
             status = 'activated' if target_user.is_active else 'deactivated'
-            
+
             # Return JSON for AJAX requests
             if request.headers.get('Content-Type') == 'application/json':
                 return JsonResponse({
@@ -2336,11 +2338,11 @@ def ajax_toggle_user_status(request, user_id):
                 # Return redirect for form submissions
                 messages.success(request, f'User {target_user.email} has been {status}.')
                 return redirect('accounts:manage_users')
-                
+
         except User.DoesNotExist:
             if request.headers.get('Content-Type') == 'application/json':
                 return JsonResponse({
-                    'success': False, 
+                    'success': False,
                     'error': 'User not found.'
                 })
             else:
@@ -2349,15 +2351,15 @@ def ajax_toggle_user_status(request, user_id):
         except Exception as e:
             if request.headers.get('Content-Type') == 'application/json':
                 return JsonResponse({
-                    'success': False, 
+                    'success': False,
                     'error': f'An error occurred: {str(e)}'
                 })
             else:
                 messages.error(request, f'An error occurred: {str(e)}')
                 return redirect('accounts:manage_users')
-    
+
     return JsonResponse({
-        'success': False, 
+        'success': False,
         'error': 'Invalid request method.'
     })
 
@@ -2370,7 +2372,7 @@ def ajax_delete_room(request, room_id):
             from booking.models import Room
             room = Room.objects.get(id=room_id)
             room_name = room.name
-            
+
             # Check if room has active bookings
             try:
                 from booking.models import Booking
@@ -2379,35 +2381,35 @@ def ajax_delete_room(request, room_id):
                     status__in=['confirmed'],
                     start_time__gte=timezone.now()
                 )
-                
+
                 if active_bookings.exists():
                     return JsonResponse({
-                        'success': False, 
+                        'success': False,
                         'error': f'Cannot delete room "{room_name}". It has active bookings.'
                     })
             except:
                 pass  # If booking model doesn't exist, skip check
-            
+
             room.delete()
-            
+
             return JsonResponse({
                 'success': True,
                 'message': f'Room "{room_name}" has been deleted successfully.'
             })
-            
+
         except Room.DoesNotExist:
             return JsonResponse({
-                'success': False, 
+                'success': False,
                 'error': 'Room not found.'
             })
         except Exception as e:
             return JsonResponse({
-                'success': False, 
+                'success': False,
                 'error': f'An error occurred: {str(e)}'
             })
-    
+
     return JsonResponse({
-        'success': False, 
+        'success': False,
         'error': 'Invalid request method.'
     })
 
@@ -2428,9 +2430,9 @@ def ajax_toggle_room_availability(request, room_id):
                 room.is_available = True
                 room.availability_status = 'available'
             room.save()
-            
+
             status = 'available' if (room.is_available and room.availability_status != 'unavailable') else 'maintenance'
-            
+
             return JsonResponse({
                 'success': True,
                 'message': f'Room "{room.name}" is now {status}.',
@@ -2441,20 +2443,20 @@ def ajax_toggle_room_availability(request, room_id):
                     'availability_status': room.availability_status
                 }
             })
-            
+
         except Room.DoesNotExist:
             return JsonResponse({
-                'success': False, 
+                'success': False,
                 'error': 'Room not found.'
             })
         except Exception as e:
             return JsonResponse({
-                'success': False, 
+                'success': False,
                 'error': f'An error occurred: {str(e)}'
             })
-    
+
     return JsonResponse({
-        'success': False, 
+        'success': False,
         'error': 'Invalid request method.'
     })
 
@@ -2509,26 +2511,26 @@ def ajax_bulk_action(request):
             data = json.loads(request.body)
             action = data.get('action')
             item_ids = data.get('item_ids', [])
-            
+
             if not action or not item_ids:
                 return JsonResponse({
-                    'success': False, 
+                    'success': False,
                     'error': 'Missing action or item IDs.'
                 })
-            
+
             success_count = 0
             error_count = 0
-            
+
             if action in ['make_admin', 'make_user', 'activate_users', 'deactivate_users']:
                 # User bulk actions
                 for user_id in item_ids:
                     try:
                         target_user = User.objects.get(id=user_id)
-                        
+
                         # Skip current user
                         if target_user == request.user:
                             continue
-                            
+
                         if action == 'make_admin':
                             if assign_user_role(target_user, 'Admin'):
                                 success_count += 1
@@ -2547,19 +2549,19 @@ def ajax_bulk_action(request):
                             target_user.is_active = False
                             target_user.save()
                             success_count += 1
-                            
+
                     except User.DoesNotExist:
                         error_count += 1
                     except Exception:
                         error_count += 1
-                        
+
             elif action in ['activate_rooms', 'deactivate_rooms', 'delete_rooms']:
                 # Room bulk actions
                 from booking.models import Room
                 for room_id in item_ids:
                     try:
                         room = Room.objects.get(id=room_id)
-                        
+
                         if action == 'activate_rooms':
                             room.is_available = True
                             room.save()
@@ -2577,7 +2579,7 @@ def ajax_bulk_action(request):
                                     status__in=['confirmed'],
                                     start_time__gte=timezone.now()
                                 )
-                                
+
                                 if not active_bookings.exists():
                                     room.delete()
                                     success_count += 1
@@ -2586,12 +2588,12 @@ def ajax_bulk_action(request):
                             except:
                                 room.delete()
                                 success_count += 1
-                                
+
                     except Room.DoesNotExist:
                         error_count += 1
                     except Exception:
                         error_count += 1
-            
+
             return JsonResponse({
                 'success': True,
                 'message': f'Bulk action completed. {success_count} items processed successfully.',
@@ -2600,20 +2602,20 @@ def ajax_bulk_action(request):
                     'error_count': error_count
                 }
             })
-            
+
         except json.JSONDecodeError:
             return JsonResponse({
-                'success': False, 
+                'success': False,
                 'error': 'Invalid JSON data.'
             })
         except Exception as e:
             return JsonResponse({
-                'success': False, 
+                'success': False,
                 'error': f'An error occurred: {str(e)}'
             })
-    
+
     return JsonResponse({
-        'success': False, 
+        'success': False,
         'error': 'Invalid request method.'
     })
 
@@ -2632,14 +2634,14 @@ def assign_user_role(user, role_name):
         user.groups.clear()
         group, created = Group.objects.get_or_create(name=role_name)
         user.groups.add(group)
-        
+
         if role_name == 'Admin':
             user.is_staff = True
             user.is_superuser = True
         else:
             user.is_staff = False
             user.is_superuser = False
-        
+
         user.save()
         print(f"Successfully assigned {role_name} role to {user.email}")
         return True
@@ -2668,7 +2670,7 @@ def create_admin_account(email, password, first_name, last_name):
         if User.objects.filter(email=email).exists():
             print(f"Admin account {email} already exists")
             return False
-        
+
         admin_user = User.objects.create_user(
             email=email,
             password=password,
@@ -2679,13 +2681,13 @@ def create_admin_account(email, password, first_name, last_name):
             faculty="Administration",
             department="IT Department"
         )
-        
+
         setup_user_groups()
         assign_user_role(admin_user, 'Admin')
-        
+
         print(f"Admin account created successfully: {email}")
         return True
-        
+
     except Exception as e:
         print(f"Error creating admin account: {e}")
         return False
@@ -2702,7 +2704,7 @@ def booking_detail_view(request, booking_id):
     try:
         from booking.models import Booking
         from datetime import timedelta
-        
+
         booking = Booking.objects.get(id=booking_id, user=request.user)
 
         duration_seconds = int((booking.end_time - booking.start_time).total_seconds())
@@ -2714,7 +2716,7 @@ def booking_detail_view(request, booking_id):
             duration_display = f"{duration_hours}h"
         else:
             duration_display = f"{duration_minutes}m"
-        
+
         # Calculate cancellation availability and penalty status
         current_time = timezone.now()
         time_until_booking = booking.start_time - current_time
@@ -2722,7 +2724,7 @@ def booking_detail_view(request, booking_id):
 
         can_cancel = booking.status in ['confirmed'] and time_until_booking.total_seconds() > 0
         late_cancellation = can_cancel and time_until_booking < minimum_notice
-        
+
         context = {
             'booking': booking,
             'user': request.user,
@@ -2735,9 +2737,9 @@ def booking_detail_view(request, booking_id):
             'cancellation_notice_hours': CANCELLATION_NOTICE_HOURS,
             'duration_display': duration_display,
         }
-        
+
         return render(request, 'UserPage/booking-detail.html', context)
-        
+
     except Booking.DoesNotExist:
         messages.error(request, 'Booking not found.')
         return redirect('accounts:booked')
@@ -2753,28 +2755,28 @@ def check_availability_ajax(request):
         try:
             from booking.models import Room, Booking
             import json
-            
+
             data = json.loads(request.body)
             room_id = data.get('room_id')
             date = data.get('date')
             start_time = data.get('start_time')
             end_time = data.get('end_time')
-            
+
             if not all([room_id, date, start_time, end_time]):
                 return JsonResponse({'error': 'Missing required parameters'}, status=400)
-            
+
             # Get room
             try:
                 room = Room.objects.get(id=room_id)
             except Room.DoesNotExist:
                 return JsonResponse({'available': False, 'message': 'Room not found'})
-            
+
             # Parse date and time
             try:
                 booking_date = datetime.strptime(date, '%Y-%m-%d').date()
                 start_time_obj = datetime.strptime(start_time, '%H:%M').time()
                 end_time_obj = datetime.strptime(end_time, '%H:%M').time()
-                
+
                 start_datetime = timezone.make_aware(datetime.combine(booking_date, start_time_obj))
                 end_datetime = timezone.make_aware(datetime.combine(booking_date, end_time_obj))
             except ValueError:
@@ -2789,7 +2791,7 @@ def check_availability_ajax(request):
                     'available': False,
                     'message': 'Room is occupied for the selected period by admin schedule rules'
                 })
-            
+
             now = timezone.now()
 
             # Policy: at least 1 hour in advance and not more than one month ahead
@@ -2798,11 +2800,11 @@ def check_availability_ajax(request):
 
             if start_datetime > now + timezone.timedelta(days=BOOKING_MAX_ADVANCE_DAYS):
                 return JsonResponse({'available': False, 'message': f'Booking cannot be made more than {BOOKING_MAX_ADVANCE_DAYS} days in advance'})
-            
+
             # Check if end time is after start time
             if start_datetime >= end_datetime:
                 return JsonResponse({'available': False, 'message': 'End time must be after start time'})
-            
+
             duration_hours = (end_datetime - start_datetime).total_seconds() / 3600
             if duration_hours < BOOKING_MIN_DURATION_HOURS:
                 return JsonResponse({'available': False, 'message': f'Minimum booking duration is {BOOKING_MIN_DURATION_HOURS} hour'})
@@ -2827,12 +2829,12 @@ def check_availability_ajax(request):
                 start_time__lt=end_datetime + buffer_delta,
                 end_time__gt=start_datetime - buffer_delta,
             )
-            
+
             if conflicts.exists():
                 conflict = conflicts.first()
                 conflict_time = conflict.start_time.strftime('%H:%M')
                 return JsonResponse({
-                    'available': False, 
+                    'available': False,
                     'message': f'Time slot conflicts with an existing booking at {conflict_time}. A {BOOKING_BUFFER_MINUTES}-minute buffer is required.',
                     'conflict': {
                         'start_time': conflict.start_time.strftime('%H:%M'),
@@ -2840,7 +2842,7 @@ def check_availability_ajax(request):
                         'user': conflict.user.get_full_name()
                     }
                 })
-            
+
             # Policy: max active bookings at any time
             active_bookings = Booking.objects.filter(
                 user=request.user,
@@ -2850,13 +2852,13 @@ def check_availability_ajax(request):
 
             if active_bookings >= BOOKING_MAX_ACTIVE_PER_USER:
                 return JsonResponse({
-                    'available': False, 
+                    'available': False,
                     'message': f'You have reached the active booking limit ({BOOKING_MAX_ACTIVE_PER_USER})'
                 })
-            
+
             # All checks passed
             return JsonResponse({
-                'available': True, 
+                'available': True,
                 'message': 'Room is available for booking',
                 'room_info': {
                     'name': room.name,
@@ -2867,10 +2869,10 @@ def check_availability_ajax(request):
                     'equipment': room.equipment
                 }
             })
-            
+
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
-    
+
     return JsonResponse({'error': 'Invalid request method'}, status=405)
 
 @login_required
@@ -2879,9 +2881,9 @@ def get_rooms_ajax(request):
     building_id = request.GET.get('building_id')
     room_type = request.GET.get('room_type', '')
     capacity_min = request.GET.get('capacity_min', '')
-    
+
     rooms = Room.objects.all()
-    
+
     # Filter by building if provided
     if building_id:
         building_codes = {
@@ -2892,11 +2894,11 @@ def get_rooms_ajax(request):
         }
         if building_id in building_codes:
             rooms = rooms.filter(room_number__startswith=building_codes[building_id])
-    
+
     # Filter by room type if provided
     if room_type:
         rooms = rooms.filter(room_type=room_type)
-    
+
     # Filter by minimum capacity if provided
     if capacity_min:
         try:
@@ -2904,7 +2906,7 @@ def get_rooms_ajax(request):
             rooms = rooms.filter(capacity__gte=capacity_min)
         except ValueError:
             pass
-    
+
     rooms_data = []
     for room in rooms:
         try:
@@ -2913,7 +2915,7 @@ def get_rooms_ajax(request):
                 start_time__gt=timezone.now(),
                 status__in=['confirmed']
             ).order_by('start_time').first()
-            
+
             rooms_data.append({
                 'id': room.id,
                 'name': room.name,
@@ -2931,10 +2933,10 @@ def get_rooms_ajax(request):
                 'current_status': room.get_current_status().replace('unavailable', 'maintenance') if hasattr(room, 'get_current_status') else ('available' if room.is_available else 'maintenance'),
                 'next_booking': next_booking.start_time.strftime('%Y-%m-%d %H:%M') if next_booking else None
             })
-        except Exception as e:
+        except Exception:
             # Skip this room if there's an error (e.g., missing field)
             continue
-    
+
     return JsonResponse({'rooms': rooms_data})
 
 @login_required
@@ -2943,13 +2945,13 @@ def get_buildings_ajax(request):
     # Extract unique building codes from room numbers
     rooms = Room.objects.all().values_list('room_number', flat=True)
     buildings_set = set()
-    
+
     for room_number in rooms:
         # Extract building code (e.g., "A" from "A-101")
         match = re.match(r'^([A-Z]+)-', str(room_number))
         if match:
             buildings_set.add(match.group(1))
-    
+
     buildings_data = []
     for idx, building_code in enumerate(sorted(buildings_set), 1):
         buildings_data.append({
@@ -2959,7 +2961,7 @@ def get_buildings_ajax(request):
             'address': '',
             'description': f'Building {building_code}'
         })
-    
+
     return JsonResponse({'buildings': buildings_data})
 
 
@@ -2968,28 +2970,28 @@ def get_buildings_ajax(request):
 def cancel_booking_view(request, booking_id):
     """Cancel a booking with 3-hour notice policy and late cancellation tracking."""
     user_role = get_user_role(request.user)
-    
+
     try:
         from booking.models import Booking
         from datetime import timedelta
-        
+
         booking = Booking.objects.get(id=booking_id, user=request.user)
-        
+
         if request.method == 'POST':
             current_time = timezone.now()
-            
+
             # Check if booking status allows cancellation
             if booking.status not in ['confirmed']:
                 error_msg = f'Cannot cancel booking with status: {booking.status}'
                 messages.error(request, error_msg)
-                
+
                 if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                     return JsonResponse({
                         'success': False,
                         'message': error_msg
                     })
                 return redirect('accounts:booked')
-            
+
             # Check cancellation timing and late-cancel penalty
             time_until_booking = booking.start_time - current_time
             minimum_notice = timedelta(hours=CANCELLATION_NOTICE_HOURS)
@@ -3020,11 +3022,11 @@ def cancel_booking_view(request, booking_id):
                     f'Late cancellation recorded (less than {CANCELLATION_NOTICE_HOURS} hours notice). '
                     f'Total late cancellations: {request.user.late_cancellation_count}.'
                 )
-            
+
             # All checks passed - cancel the booking
             booking.status = 'cancelled'
             booking.save()
-            
+
             # Try to delete Google Calendar event if it exists
             try:
                 from booking.google_calendar import GoogleCalendarIntegration
@@ -3033,7 +3035,7 @@ def cancel_booking_view(request, booking_id):
                     calendar_integration.delete_event(request.user, booking.calendar_event_id)
             except Exception as e:
                 print(f"Error deleting calendar event: {e}")
-            
+
             success_msg = f'Booking for {booking.room.name} on {booking.start_time.strftime("%Y-%m-%d at %H:%M")} has been cancelled.'
             if late_cancel_message:
                 success_msg = f'{success_msg} {late_cancel_message}'
@@ -3043,7 +3045,7 @@ def cancel_booking_view(request, booking_id):
                     '(issued every 2 late cancellations).'
                 )
             messages.success(request, success_msg)
-            
+
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return JsonResponse({
                     'success': True,
@@ -3051,16 +3053,16 @@ def cancel_booking_view(request, booking_id):
                     'late_cancellation': late_cancellation,
                     'warning_issued': warning_issued,
                 })
-            
+
             return redirect('accounts:booked')
-        
+
         # GET request - show confirmation page
         current_time = timezone.now()
         time_until_booking = booking.start_time - current_time
         minimum_notice = timedelta(hours=CANCELLATION_NOTICE_HOURS)
 
         can_cancel = booking.status in ['confirmed'] and time_until_booking.total_seconds() > 0
-        
+
         context = {
             'user': request.user,
             'user_role': user_role,
@@ -3072,9 +3074,9 @@ def cancel_booking_view(request, booking_id):
             'late_cancellation': can_cancel and time_until_booking < minimum_notice,
             'cancellation_notice_hours': CANCELLATION_NOTICE_HOURS,
         }
-        
+
         return render(request, 'UserPage/cancelBooking.html', context)
-        
+
     except Booking.DoesNotExist:
         messages.error(request, 'Booking not found.')
         return redirect('accounts:booked')
@@ -3090,15 +3092,15 @@ def cancel_booking_view(request, booking_id):
 def get_room_details_ajax(request):
     """AJAX endpoint to get room details for autofill"""
     room_id = request.GET.get('room_id')
-    
+
     if not room_id:
         return JsonResponse({'success': False, 'error': 'Room ID is required'})
-    
+
     try:
-        
+
         room = Room.objects.get(id=room_id)
         current_status = room.get_current_status().replace('unavailable', 'maintenance') if hasattr(room, 'get_current_status') else ('available' if room.is_available else 'maintenance')
-        
+
         return JsonResponse({
             'success': True,
             'room': {
@@ -3118,21 +3120,21 @@ def get_room_details_ajax(request):
         return JsonResponse({'success': False, 'error': 'Room not found'})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
-    
+
 @login_required
 @admin_required
 def admin_booking_detail_view(request, booking_id):
     """Admin view for booking details"""
     user_role = get_user_role(request.user)
-    
+
     booking = Booking.objects.get(id=booking_id)
-    
+
     context = {
         'booking': booking,
         'user': request.user,
         'user_role': user_role,
     }
-    
+
     try:
         return render(request, 'AdminPage/booking-detail.html', context)
     except Booking.DoesNotExist:
@@ -3149,19 +3151,19 @@ def admin_booking_detail_view(request, booking_id):
 def deactivate_user_view(request):
     """Deactivate user - only for existing admins"""
     user_role = get_user_role(request.user)
-    
+
     if not request.user.is_admin:
         messages.error(request, 'Admin access required.')
         return redirect('accounts:user_dashboard')
-    
+
     if request.method == 'POST':
         try:
             user_email = request.POST.get('user_email')
             action = request.POST.get('action')  # 'deactivate' or 'activate'
-            
+
             if user_email:
                 user = User.objects.get(email=user_email)
-                
+
                 # Prevent deactivating self
                 if user.id == request.user.id:
                     messages.warning(request, 'You cannot deactivate your own account.')
@@ -3181,21 +3183,21 @@ def deactivate_user_view(request):
                         messages.success(request, f'User {user.get_full_name()} has been activated.')
             else:
                 messages.error(request, 'Please provide a valid email address.')
-                
+
         except User.DoesNotExist:
             messages.error(request, 'User not found.')
         except Exception as e:
             messages.error(request, f'Error: {str(e)}')
-        
+
         return redirect('accounts:deactivate_user')
-    
+
     # Get all users for selection
     active_users = User.objects.filter(is_active=True).exclude(id=request.user.id).order_by('first_name', 'email')
     inactive_users = User.objects.filter(is_active=False).order_by('first_name', 'email')
-    
+
     # Pre-select user if email is provided in GET parameters
     selected_user_email = request.GET.get('user_email', '')
-    
+
     context = {
         'user': request.user,
         'user_role': user_role,
@@ -3203,5 +3205,5 @@ def deactivate_user_view(request):
         'inactive_users': inactive_users,
         'selected_user_email': selected_user_email,
     }
-    
+
     return render(request, 'AdminPage/deactivateUser.html', context)

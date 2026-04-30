@@ -1,0 +1,75 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ page_title }} - Booking AI</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fc; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .hero {
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            color: white;
+            padding: 60px 0;
+            text-align: center;
+        }
+        .stat-card {
+            background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: center; margin-bottom: 20px;
+        }
+        .stat-card h3 { font-size: 2rem; color: #1e3a8a; margin-bottom: 5px; }
+        .stat-card p { color: #64748b; margin-bottom: 0; font-weight: 500; }
+        .main-container { max-width: 900px; margin: -40px auto 40px auto; position: relative; z-index: 10; padding: 0 20px; }
+        .back-btn { margin-bottom: 20px; display: inline-block; color: white; text-decoration: none; font-weight: 500; }
+        .back-btn:hover { color: #e2e8f0; }
+    </style>
+</head>
+<body>
+    <div class="hero">
+        <div class="container">
+            <h1 class="display-5 fw-bold mb-3"><i class="bi bi-robot"></i> AI Room Booking Assistant</h1>
+            <p class="lead mb-4">Chat with our intelligent assistant to instantly find and book rooms.</p>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <a href="{% url 'accounts:user_dashboard' %}" class="back-btn"><i class="bi bi-arrow-left"></i> Back to Dashboard</a>
+        
+        <div class="row">
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <h3>{{ total_rooms }}</h3>
+                    <p>Total Rooms</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <h3>{{ available_rooms }}</h3>
+                    <p>Available Now</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <h3>{{ total_bookings }}</h3>
+                    <p>Total Bookings</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0" style="border-radius: 12px; margin-top: 20px;">
+            <div class="card-body p-5 text-center">
+                <h4 class="mb-4 text-primary"><i class="bi bi-chat-dots-fill text-primary"></i> The AI Chatbot is running!</h4>
+                <p class="text-muted mb-4" style="font-size: 1.1rem;">Click the chat icon in the bottom right corner of this page to start talking to the assistant.</p>
+                <button class="btn btn-primary px-4 py-2 rounded-pill shadow" onclick="document.querySelector('.chatbot-toggle-button').click()">
+                    Open Chat Window
+                </button>
+            </div>
+        </div>
+    </div>
+
+    {% include 'includes/chatbot_widget.html' %}
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 from django.urls import include, path
-from . import views
+from . import mobile_api, views
 from django.contrib.auth import views as auth_views
 
 app_name = 'accounts'
@@ -23,7 +23,7 @@ urlpatterns = [
     path('admin/booking-detail/<int:booking_id>/', views.admin_booking_detail_view, name='admin_booking_detail'),
     path('booking/<int:booking_id>/cancel/', views.cancel_booking_view, name='cancel_booking'),
     path('deactivate-user/', views.deactivate_user_view, name='deactivate_user'),
-    
+
     # Room Booking Calendar (FullCalendar)
     path('room-schedule/', views.room_schedule_view, name='room_schedule'),
     path('api/room-bookings/', views.api_room_bookings, name='api_room_bookings'),
@@ -46,6 +46,10 @@ urlpatterns = [
     path('login/', views.custom_login_view, name='login'),
     path('logout/', views.custom_logout_view, name='logout'),
 
+    # Mobile API endpoints for the Flutter app
+    path('api/login/', mobile_api.mobile_login, name='api_login'),
+    path('api/profile/', mobile_api.mobile_profile, name='api_profile'),
+
     # Registration URL
     path('register/', views.register, name='register'),
 
@@ -54,7 +58,7 @@ urlpatterns = [
     path('admin/settings/', views.admin_setting_view, name='admin_settings'),
     path('dashboard/', views.user_dashboard_view, name='dashboard'),
     path('user-dashboard/', views.user_dashboard_view, name='user_dashboard'),
-    
+
     # Admin management URLs (added for dashboard actions)
     path('admin/manage-rooms/', views.manage_rooms_view, name='manage_rooms'),
     path('admin/room-management/', views.admin_room_management_view, name='admin_room_management'),

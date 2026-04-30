@@ -4,14 +4,14 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from datetime import datetime, time, timedelta
 from .models import Room, Booking, BookingRule
-from .models import Room, Booking, BookingRule, Announcement
+from .models import Announcement
 from django.contrib.auth import get_user_model
 User = get_user_model()
 
 
 class RoomForm(forms.ModelForm):
     """Form for creating and editing rooms"""
-    
+
     class Meta:
         model = Room
         fields = [
@@ -122,16 +122,16 @@ class RoomForm(forms.ModelForm):
             # Check file size (10MB limit)
             if image.size > 10 * 1024 * 1024:
                 raise forms.ValidationError('Image file size should be less than 10MB.')
-            
+
             # Check file type
             if not image.content_type.startswith('image/'):
                 raise forms.ValidationError('Please upload a valid image file (JPG, PNG, GIF, etc.).')
-        
+
         return image
 
 class RoomSearchForm(forms.Form):
     """Form for searching and filtering rooms"""
-    
+
     ROOM_TYPE_CHOICES = [
         ('', 'All Types'),
         ('conference', 'Conference Room'),
@@ -142,7 +142,7 @@ class RoomSearchForm(forms.Form):
         ('office', 'Office'),
         ('other', 'Other'),
     ]
-    
+
     search = forms.CharField(
         required=False,
         widget=forms.TextInput(attrs={
@@ -150,7 +150,7 @@ class RoomSearchForm(forms.Form):
             'placeholder': 'Search rooms by name, number, or description...'
         })
     )
-    
+
     room_type = forms.ChoiceField(
         choices=ROOM_TYPE_CHOICES,
         required=False,
@@ -158,7 +158,7 @@ class RoomSearchForm(forms.Form):
             'class': 'form-control'
         })
     )
-    
+
     min_capacity = forms.IntegerField(
         required=False,
         widget=forms.NumberInput(attrs={
@@ -167,7 +167,7 @@ class RoomSearchForm(forms.Form):
             'min': '1'
         })
     )
-    
+
     max_capacity = forms.IntegerField(
         required=False,
         widget=forms.NumberInput(attrs={
@@ -176,7 +176,7 @@ class RoomSearchForm(forms.Form):
             'min': '1'
         })
     )
-    
+
     availability_date = forms.DateField(
         required=False,
         widget=forms.DateInput(attrs={
@@ -184,7 +184,7 @@ class RoomSearchForm(forms.Form):
             'type': 'date'
         })
     )
-    
+
     start_time = forms.TimeField(
         required=False,
         widget=forms.TimeInput(attrs={
@@ -192,7 +192,7 @@ class RoomSearchForm(forms.Form):
             'type': 'time'
         })
     )
-    
+
     end_time = forms.TimeField(
         required=False,
         widget=forms.TimeInput(attrs={
@@ -200,7 +200,7 @@ class RoomSearchForm(forms.Form):
             'type': 'time'
         })
     )
-    
+
     available_only = forms.BooleanField(
         required=False,
         widget=forms.CheckboxInput(attrs={
@@ -215,40 +215,40 @@ class RoomSearchForm(forms.Form):
         availability_date = cleaned_data.get('availability_date')
         start_time = cleaned_data.get('start_time')
         end_time = cleaned_data.get('end_time')
-        
+
         # Validate capacity range
         if min_capacity and max_capacity and min_capacity > max_capacity:
             raise forms.ValidationError('Minimum capacity cannot be greater than maximum capacity.')
-        
+
         # Validate time range
         if start_time and end_time and start_time >= end_time:
             raise forms.ValidationError('Start time must be before end time.')
-        
+
         # If checking availability, all date/time fields are required
         if any([availability_date, start_time, end_time]):
             if not all([availability_date, start_time, end_time]):
                 raise forms.ValidationError('Date, start time, and end time are all required for availability checking.')
-        
+
         return cleaned_data
 
 
 class BookingForm(forms.ModelForm):
     """Form for creating and editing bookings"""
-    
+
     start_date = forms.DateField(
         widget=forms.DateInput(attrs={
             'class': 'form-control',
             'type': 'date'
         })
     )
-    
+
     start_time = forms.TimeField(
         widget=forms.TimeInput(attrs={
             'class': 'form-control',
             'type': 'time'
         })
     )
-    
+
     end_time = forms.TimeField(
         widget=forms.TimeInput(attrs={
             'class': 'form-control',
@@ -262,7 +262,7 @@ class BookingForm(forms.ModelForm):
             'required': 'You must agree to the room usage policy before booking.'
         }
     )
-    
+
     class Meta:
         model = Booking
         fields = ['room', 'purpose', 'attendees', 'start_date', 'start_time', 'end_time']
@@ -284,10 +284,10 @@ class BookingForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
-        
+
         # Only show available rooms
         self.fields['room'].queryset = Room.objects.filter(is_available=True).exclude(availability_status='unavailable')
-        
+
         # Set default values
         if not self.instance.pk:  # Only for new bookings
             self.fields['start_date'].initial = timezone.now().date()
@@ -297,7 +297,7 @@ class BookingForm(forms.ModelForm):
     def clean_attendees(self):
         attendees = self.cleaned_data.get('attendees')
         room = self.cleaned_data.get('room')
-        
+
         if attendees and room:
             min_allowed = getattr(room, 'min_booking_capacity', 1)
             max_allowed = getattr(room, 'max_booking_capacity', room.capacity)
@@ -305,7 +305,7 @@ class BookingForm(forms.ModelForm):
                 raise forms.ValidationError(
                     f'Number of attendees must be between {min_allowed} and {max_allowed} for this room.'
                 )
-        
+
         return attendees
 
     def clean(self):
@@ -314,26 +314,26 @@ class BookingForm(forms.ModelForm):
         start_time = cleaned_data.get('start_time')
         end_time = cleaned_data.get('end_time')
         room = cleaned_data.get('room')
-        
+
         if not all([start_date, start_time, end_time]):
             return cleaned_data
-        
+
         # Validate time range
         if start_time >= end_time:
             raise forms.ValidationError('Start time must be before end time.')
-        
+
         # Create datetime objects
         start_datetime = timezone.make_aware(datetime.combine(start_date, start_time))
         end_datetime = timezone.make_aware(datetime.combine(start_date, end_time))
-        
+
         # Check if booking is in the past
         if start_datetime <= timezone.now():
             raise forms.ValidationError('Booking cannot be in the past.')
-        
+
         # Check if booking is too far in the future (e.g., 6 months)
         if start_datetime > timezone.now() + timedelta(days=180):
             raise forms.ValidationError('Booking cannot be more than 6 months in advance.')
-        
+
         # Check for conflicts (exclude current booking if editing)
         if room:
             if room.get_current_status(start_datetime) != 'available':
@@ -348,42 +348,42 @@ class BookingForm(forms.ModelForm):
                 end_time__gt=start_datetime,
                     status__in=['confirmed']
             )
-            
+
             # Exclude current booking if editing
             if self.instance.pk:
                 conflicts = conflicts.exclude(pk=self.instance.pk)
-            
+
             if conflicts.exists():
                 # Get details of conflicting booking for better error message
                 conflict = conflicts.first()
                 conflict_start = conflict.start_time.strftime('%I:%M %p')
                 conflict_end = conflict.end_time.strftime('%I:%M %p')
                 conflict_user = conflict.user.get_full_name() or conflict.user.username
-                
+
                 raise forms.ValidationError(
                     f'This time slot conflicts with an existing booking by {conflict_user} '
                     f'from {conflict_start} to {conflict_end}. Please choose a different time.'
                 )
-        
+
         # Store combined datetime for use in views
         cleaned_data['start_datetime'] = start_datetime
         cleaned_data['end_datetime'] = end_datetime
 
         if not self.instance.pk and not cleaned_data.get('policy_agreement'):
             raise forms.ValidationError('You must agree to the room usage policy before booking.')
-        
+
         return cleaned_data
 
 
 class BookingSearchForm(forms.Form):
     """Form for searching bookings"""
-    
+
     STATUS_CHOICES = [
         ('', 'All Statuses'),
         ('confirmed', 'Confirmed'),
         ('cancelled', 'Cancelled'),
     ]
-    
+
     search = forms.CharField(
         required=False,
         widget=forms.TextInput(attrs={
@@ -391,7 +391,7 @@ class BookingSearchForm(forms.Form):
             'placeholder': 'Search by room name or purpose...'
         })
     )
-    
+
     status = forms.ChoiceField(
         choices=STATUS_CHOICES,
         required=False,
@@ -399,7 +399,7 @@ class BookingSearchForm(forms.Form):
             'class': 'form-control'
         })
     )
-    
+
     date_from = forms.DateField(
         required=False,
         widget=forms.DateInput(attrs={
@@ -407,7 +407,7 @@ class BookingSearchForm(forms.Form):
             'type': 'date'
         })
     )
-    
+
     date_to = forms.DateField(
         required=False,
         widget=forms.DateInput(attrs={
@@ -420,37 +420,37 @@ class BookingSearchForm(forms.Form):
         cleaned_data = super().clean()
         date_from = cleaned_data.get('date_from')
         date_to = cleaned_data.get('date_to')
-        
+
         if date_from and date_to and date_from > date_to:
             raise forms.ValidationError('Start date must be before end date.')
-        
+
         return cleaned_data
 
 
 class QuickBookingForm(forms.Form):
     """Simplified form for quick bookings"""
-    
+
     room = forms.ModelChoiceField(
         queryset=Room.objects.filter(is_available=True),
         widget=forms.Select(attrs={
             'class': 'form-control'
         })
     )
-    
+
     date = forms.DateField(
         widget=forms.DateInput(attrs={
             'class': 'form-control',
             'type': 'date'
         })
     )
-    
+
     start_time = forms.TimeField(
         widget=forms.TimeInput(attrs={
             'class': 'form-control',
             'type': 'time'
         })
     )
-    
+
     duration = forms.ChoiceField(
         choices=[
             (30, '30 minutes'),
@@ -463,14 +463,14 @@ class QuickBookingForm(forms.Form):
             'class': 'form-control'
         })
     )
-    
+
     purpose = forms.CharField(
         widget=forms.TextInput(attrs={
             'class': 'form-control',
             'placeholder': 'Meeting purpose'
         })
     )
-    
+
     attendees = forms.IntegerField(
         widget=forms.NumberInput(attrs={
             'class': 'form-control',
@@ -493,24 +493,24 @@ class QuickBookingForm(forms.Form):
         duration = cleaned_data.get('duration')
         room = cleaned_data.get('room')
         attendees = cleaned_data.get('attendees')
-        
+
         if not all([date, start_time, duration]):
             return cleaned_data
-        
+
         # Calculate end time
         start_datetime = timezone.make_aware(datetime.combine(date, start_time))
         end_datetime = start_datetime + timedelta(minutes=int(duration))
-        
+
         # Validate booking time
         if start_datetime <= timezone.now():
             raise forms.ValidationError('Booking cannot be in the past.')
-        
+
         # Check room capacity
         if room and attendees and attendees > room.capacity:
             raise forms.ValidationError(
                 f'Number of attendees ({attendees}) exceeds room capacity ({room.capacity}).'
             )
-        
+
         # Check for conflicts
         if room:
             conflicts = Booking.objects.filter(
@@ -519,20 +519,20 @@ class QuickBookingForm(forms.Form):
                 end_time__gt=start_datetime,
                 status__in=['pending', 'confirmed']
             )
-            
+
             if conflicts.exists():
                 raise forms.ValidationError('This time slot conflicts with an existing booking.')
-        
+
         # Store calculated values
         cleaned_data['start_datetime'] = start_datetime
         cleaned_data['end_datetime'] = end_datetime
-        
+
         return cleaned_data
 
 
 class BookingRuleForm(forms.ModelForm):
     """Form for creating and editing booking rules"""
-    
+
     class Meta:
         model = BookingRule
         fields = [
@@ -549,7 +549,7 @@ class BookingRuleForm(forms.ModelForm):
             'is_active',
         ]
 
-    
+
 class AdminBookingForm(forms.ModelForm):
     """Form for admin to create/edit bookings"""
     class Meta:
@@ -563,24 +563,24 @@ class AdminBookingForm(forms.ModelForm):
             'purpose': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Enter booking purpose'}),
             'status': forms.Select(attrs={'class': 'form-control'}),
         }
-    
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Only show active users
         self.fields['user'].queryset = User.objects.filter(is_active=True).order_by('first_name')
         # Only show available rooms
         self.fields['room'].queryset = Room.objects.filter(is_available=True).order_by('name')
-    
+
     def clean(self):
         cleaned_data = super().clean()
         start_time = cleaned_data.get('start_time')
         end_time = cleaned_data.get('end_time')
         room = cleaned_data.get('room')
-        
+
         if start_time and end_time:
             if start_time >= end_time:
                 raise forms.ValidationError("End time must be after start time.")
-            
+
             # Check for conflicts (exclude current booking if editing)
             conflicts = Booking.objects.filter(
                 room=room,
@@ -588,13 +588,13 @@ class AdminBookingForm(forms.ModelForm):
                 start_time__lt=end_time,
                 end_time__gt=start_time
             )
-            
+
             if self.instance.pk:
                 conflicts = conflicts.exclude(pk=self.instance.pk)
-            
+
             if conflicts.exists():
                 raise forms.ValidationError("This time slot conflicts with an existing booking.")
-        
+
         return cleaned_data
 
 
@@ -611,7 +611,7 @@ class AnnouncementForm(forms.ModelForm):
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'show_until': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
         }
-    
+
     def clean_show_until(self):
         show_until = self.cleaned_data.get('show_until')
         if show_until:
@@ -627,7 +627,7 @@ class BulkRoomActionForm(forms.Form):
         ('make_unavailable', 'Make Unavailable'),
         ('delete', 'Delete'),
     ]
-    
+
     action = forms.ChoiceField(choices=ACTION_CHOICES, widget=forms.Select(attrs={'class': 'form-control'}))
     room_ids = forms.ModelMultipleChoiceField(
         queryset=Room.objects.all(),

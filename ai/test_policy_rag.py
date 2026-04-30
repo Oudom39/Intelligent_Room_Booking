@@ -23,7 +23,7 @@ try:
     from ai.vector_store import get_vector_store
     vs = get_vector_store()
     stats = vs.get_collection_stats()
-    print(f"✓ Vector Store loaded")
+    print("✓ Vector Store loaded")
     print(f"  Collections: {stats}")
 except Exception as e:
     print(f"✗ Vector Store failed: {e}")
@@ -34,7 +34,7 @@ print("\n[Test 2] Checking Document Loader...")
 try:
     from ai.document_ingestion_langchain import LangChainDocumentLoader
     loader = LangChainDocumentLoader()
-    print(f"✓ Document Loader initialized")
+    print("✓ Document Loader initialized")
 except Exception as e:
     print(f"✗ Document Loader failed: {e}")
     sys.exit(1)
@@ -44,7 +44,7 @@ print("\n[Test 3] Checking Policy File...")
 policy_path = os.path.join(os.path.dirname(__file__), "..", "policy.md")
 if os.path.exists(policy_path):
     file_size = os.path.getsize(policy_path)
-    print(f"✓ policy.md found")
+    print("✓ policy.md found")
     print(f"  Path: {policy_path}")
     print(f"  Size: {file_size} bytes")
 else:
@@ -58,10 +58,10 @@ try:
     success = ingest_policy_document()
     if success:
         stats = vs.get_collection_stats()
-        print(f"✓ Policies ingested successfully")
+        print("✓ Policies ingested successfully")
         print(f"  New stats: {stats}")
     else:
-        print(f"✗ Ingestion failed")
+        print("✗ Ingestion failed")
         sys.exit(1)
 except Exception as e:
     print(f"✗ Ingestion error: {e}")
@@ -98,7 +98,7 @@ try:
         intent="information",
         top_k=3
     )
-    print(f"✓ Hybrid Retriever working")
+    print("✓ Hybrid Retriever working")
     print(f"  Retrieved {len(results)} results")
     if results:
         print(f"  Top result score: {results[0].get('score', 'N/A')}")

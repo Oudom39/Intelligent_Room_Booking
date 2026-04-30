@@ -14,10 +14,7 @@ django-filter>=23.3
 djangorestframework>=3.14.0
 python-dotenv>=1.0.0
 
-<<<<<<< HEAD
-=======
-
-# Semantic Kernel (required for AI integration used by `ai/` and `chatbot/` modules)
+# Semantic Kernel (required for AI integration)
 semantic-kernel>=0.1.0,<2.0.0
 
 # LangChain (required for document ingestion and RAG)
@@ -25,11 +22,10 @@ langchain>=0.1.0
 langchain-text-splitters>=0.0.1
 langchain-community>=0.0.1
 
-# Async HTTP client used by async plugin functions
+# Async HTTP client
 httpx>=0.24.0,<0.25.0
 uvicorn[standard]>=0.24.0,<1.0.0
 
->>>>>>> 692fd3ccc3419837b8c9b1eea569382b70a18043
 # Analytics Dashboard (Streamlit)
 streamlit>=1.28.0
 pandas>=2.0.0

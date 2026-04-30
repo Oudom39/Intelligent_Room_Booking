@@ -6,9 +6,13 @@ DEBUG = True
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', '*.ngrok.io']
 
 # Enable all development tools
-INSTALLED_APPS += [
-    'django_extensions',  # If available
-]
+try:
+    import importlib
+    if importlib.util.find_spec('django_extensions') is not None:
+        INSTALLED_APPS += ['django_extensions']
+except Exception:
+    # django-extensions not installed in this environment; skip it
+    pass
 
 # Development database (SQLite is fine)
 USE_SQLITE = os.environ.get('USE_SQLITE', 'True') == 'True'

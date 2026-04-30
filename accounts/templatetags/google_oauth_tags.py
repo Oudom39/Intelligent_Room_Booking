@@ -62,7 +62,7 @@ def safe_google_signup_url(context):
         return ""
 
 
-@register.simple_tag(takes_context=True) 
+@register.simple_tag(takes_context=True)
 def safe_google_login_url_with_process(context, process="login"):
     """
     Safely get Google login/signup URL with explicit process parameter.

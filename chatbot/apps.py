@@ -32,6 +32,14 @@ class ChatbotConfig(AppConfig):
         try:
             logger.info("Initializing Chatbot...")
 
+            # Respect global feature flag before initializing heavy AI subsystems
+            from django.conf import settings
+
+            if not getattr(settings, 'AI_ENABLED', False):
+                logger.info("AI features disabled (AI_ENABLED=False). Skipping ChatAgent initialization.")
+                _chat_agent = None
+                return
+
             # Import ONLY what is needed for bootstrap
             from chatbot.initializer import create_chat_agent
 

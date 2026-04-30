@@ -1,8 +1,14 @@
 import os
 import logging
 from typing import List, Dict, Optional
-import chromadb
-from chromadb.config import Settings
+try:
+    import chromadb
+    from chromadb.config import Settings
+    CHROMADB_AVAILABLE = True
+except Exception:
+    chromadb = None
+    Settings = None
+    CHROMADB_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +20,12 @@ class VectorStore:
     """
 
     def __init__(self, persist_directory: Optional[str] = None):
+
+        if not CHROMADB_AVAILABLE:
+            raise RuntimeError(
+                "chromadb is not installed. Install 'chromadb' to enable the vector store "
+                "or avoid constructing VectorStore when AI features are disabled."
+            )
 
         self.persist_directory = persist_directory or os.getenv(
             "VECTOR_DB_PATH",

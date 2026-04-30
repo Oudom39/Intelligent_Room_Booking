@@ -81,23 +81,23 @@ def api_list_rooms(request):
         capacity_min = request.GET.get('capacity_min', None)
         capacity_max = request.GET.get('capacity_max', None)
         available_only = request.GET.get('available_only', 'true').lower() == 'true'
-        
+
         # Base query
         rooms = Room.objects.all()
-        
+
         # Apply filters
         if available_only:
             rooms = rooms.filter(is_available=True, availability_status='available')
-        
+
         if room_type:
             rooms = rooms.filter(room_type=room_type)
-        
+
         if capacity_min:
             rooms = rooms.filter(capacity__gte=int(capacity_min))
-        
+
         if capacity_max:
             rooms = rooms.filter(capacity__lte=int(capacity_max))
-        
+
         # Serialize rooms
         rooms_data = []
         for room in rooms:
@@ -112,13 +112,13 @@ def api_list_rooms(request):
                 'is_available': room.is_available,
                 'availability_status': room.availability_status
             })
-        
+
         return JsonResponse({
             'success': True,
             'count': len(rooms_data),
             'rooms': rooms_data
         })
-    
+
     except Exception as e:
         return JsonResponse({
             'success': False,
@@ -135,18 +135,18 @@ def api_check_availability(request):
         date_str = request.GET.get('date')  # Format: YYYY-MM-DD
         start_time_str = request.GET.get('start_time')  # Format: HH:MM
         end_time_str = request.GET.get('end_time')  # Format: HH:MM
-        
+
         if not all([room_id, date_str, start_time_str, end_time_str]):
             return JsonResponse({
                 'success': False,
                 'error': 'Missing required parameters: room_id, date, start_time, end_time'
             }, status=400)
-        
+
         # Parse date and time
         date = datetime.strptime(date_str, '%Y-%m-%d').date()
         start_time = datetime.strptime(start_time_str, '%H:%M').time()
         end_time = datetime.strptime(end_time_str, '%H:%M').time()
-        
+
         # Create datetime objects
         start_datetime = timezone.make_aware(datetime.combine(date, start_time))
         end_datetime = timezone.make_aware(datetime.combine(date, end_time))
@@ -188,13 +188,13 @@ def api_check_availability(request):
                 'available': False,
                 'error': f'Maximum booking duration is {BOOKING_MAX_DURATION_HOURS} hours'
             }, status=400)
-        
+
         # Get room
         room = Room.objects.get(id=room_id)
-        
+
         # Check if room is available
         is_available = room.is_available_at(start_datetime, end_datetime)
-        
+
         # Get conflicting bookings if not available
         conflicts = []
         if not is_available:
@@ -204,7 +204,7 @@ def api_check_availability(request):
                 end_time__gt=start_datetime,
                 status='confirmed'
             )
-            
+
             for booking in conflicting_bookings:
                 conflicts.append({
                     'booking_id': booking.id,
@@ -213,7 +213,7 @@ def api_check_availability(request):
                     'end_time': booking.end_time.strftime('%Y-%m-%d %H:%M'),
                     'purpose': booking.purpose
                 })
-        
+
         return JsonResponse({
             'success': True,
             'available': is_available,
@@ -229,7 +229,7 @@ def api_check_availability(request):
             },
             'conflicts': conflicts
         })
-    
+
     except Room.DoesNotExist:
         return JsonResponse({
             'success': False,
@@ -252,7 +252,7 @@ def api_create_booking(request):
     try:
         # Parse JSON body
         data = json.loads(request.body)
-        
+
         # Get required fields
         user_email = data.get('user_email')
         room_id = data.get('room_id')
@@ -262,14 +262,14 @@ def api_create_booking(request):
         purpose = data.get('purpose')
         attendees = data.get('attendees', 1)
         notes = data.get('notes', '')
-        
+
         # Validate required fields
         if not all([user_email, room_id, date_str, start_time_str, end_time_str, purpose]):
             return JsonResponse({
                 'success': False,
                 'error': 'Missing required fields: user_email, room_id, date, start_time, end_time, purpose'
             }, status=400)
-        
+
         # Get user
         try:
             user = User.objects.get(email=user_email)
@@ -278,7 +278,7 @@ def api_create_booking(request):
                 'success': False,
                 'error': f'User with email {user_email} not found'
             }, status=404)
-        
+
         # Get room
         try:
             room = Room.objects.get(id=room_id)
@@ -287,16 +287,16 @@ def api_create_booking(request):
                 'success': False,
                 'error': f'Room with ID {room_id} not found'
             }, status=404)
-        
+
         # Parse date and time
         date = datetime.strptime(date_str, '%Y-%m-%d').date()
         start_time = datetime.strptime(start_time_str, '%H:%M').time()
         end_time = datetime.strptime(end_time_str, '%H:%M').time()
-        
+
         # Create datetime objects
         start_datetime = timezone.make_aware(datetime.combine(date, start_time))
         end_datetime = timezone.make_aware(datetime.combine(date, end_time))
-        
+
         # Validate booking time
         now = timezone.now()
         if start_datetime < now:
@@ -304,13 +304,13 @@ def api_create_booking(request):
                 'success': False,
                 'error': 'Cannot book rooms in the past'
             }, status=400)
-        
+
         if start_datetime >= end_datetime:
             return JsonResponse({
                 'success': False,
                 'error': 'End time must be after start time'
             }, status=400)
-        
+
         # Check duration limits
         duration = end_datetime - start_datetime
         duration_hours = duration.total_seconds() / 3600
@@ -319,13 +319,13 @@ def api_create_booking(request):
                 'success': False,
                 'error': f'Minimum booking duration is {BOOKING_MIN_DURATION_HOURS} hour'
             }, status=400)
-        
+
         if duration_hours > BOOKING_MAX_DURATION_HOURS:
             return JsonResponse({
                 'success': False,
                 'error': f'Maximum booking duration is {BOOKING_MAX_DURATION_HOURS} hours'
             }, status=400)
-        
+
         # Check advance booking limits
         advance_days = (start_datetime - now).days
         if advance_days > BOOKING_MAX_ADVANCE_DAYS:
@@ -333,14 +333,14 @@ def api_create_booking(request):
                 'success': False,
                 'error': f'Cannot book more than {BOOKING_MAX_ADVANCE_DAYS} days in advance'
             }, status=400)
-        
+
         advance_hours = (start_datetime - now).total_seconds() / 3600
         if advance_hours < BOOKING_MIN_ADVANCE_HOURS:
             return JsonResponse({
                 'success': False,
                 'error': f'Must book at least {BOOKING_MIN_ADVANCE_HOURS} hour in advance'
             }, status=400)
-        
+
         # Check capacity
         if attendees > room.capacity:
             return JsonResponse({
@@ -392,14 +392,14 @@ def api_create_booking(request):
                 'success': False,
                 'error': consecutive_error
             }, status=400)
-        
+
         # Check room availability
         if not room.is_available_at(start_datetime, end_datetime):
             return JsonResponse({
                 'success': False,
                 'error': 'Room is not available at the requested time. Please choose a different time slot.'
             }, status=400)
-        
+
         # Create booking
         booking = Booking.objects.create(
             user=user,
@@ -411,7 +411,7 @@ def api_create_booking(request):
             additional_notes=notes,
             status='confirmed'
         )
-        
+
         return JsonResponse({
             'success': True,
             'message': 'Booking created successfully',
@@ -428,7 +428,7 @@ def api_create_booking(request):
                 'created_at': booking.created_at.strftime('%Y-%m-%d %H:%M')
             }
         }, status=201)
-    
+
     except json.JSONDecodeError:
         return JsonResponse({
             'success': False,
@@ -447,13 +447,13 @@ def api_list_user_bookings(request):
     try:
         user_email = request.GET.get('user_email')
         status = request.GET.get('status', None)  # confirmed, cancelled, or None for all
-        
+
         if not user_email:
             return JsonResponse({
                 'success': False,
                 'error': 'user_email parameter is required'
             }, status=400)
-        
+
         # Get user
         try:
             user = User.objects.get(email=user_email)
@@ -462,18 +462,18 @@ def api_list_user_bookings(request):
                 'success': False,
                 'error': f'User with email {user_email} not found'
             }, status=404)
-        
+
         # Get bookings
         bookings = Booking.objects.filter(user=user)
-        
+
         if status:
             bookings = bookings.filter(status=status)
-        
+
         # Separate upcoming and past bookings
         now = timezone.now()
         upcoming_bookings = bookings.filter(end_time__gte=now).order_by('start_time')
         past_bookings = bookings.filter(end_time__lt=now).order_by('-start_time')
-        
+
         def serialize_booking(booking):
             return {
                 'id': booking.id,
@@ -488,7 +488,7 @@ def api_list_user_bookings(request):
                 'can_cancel': booking.can_cancel(),
                 'created_at': booking.created_at.strftime('%Y-%m-%d %H:%M')
             }
-        
+
         return JsonResponse({
             'success': True,
             'user': {
@@ -499,7 +499,7 @@ def api_list_user_bookings(request):
             'past_bookings': [serialize_booking(b) for b in past_bookings],
             'total_count': bookings.count()
         })
-    
+
     except Exception as e:
         return JsonResponse({
             'success': False,
@@ -514,13 +514,13 @@ def api_cancel_booking(request):
         data = json.loads(request.body)
         booking_id = data.get('booking_id')
         user_email = data.get('user_email')
-        
+
         if not all([booking_id, user_email]):
             return JsonResponse({
                 'success': False,
                 'error': 'Missing required fields: booking_id, user_email'
             }, status=400)
-        
+
         # Get booking
         try:
             booking = Booking.objects.get(id=booking_id)
@@ -529,21 +529,21 @@ def api_cancel_booking(request):
                 'success': False,
                 'error': f'Booking with ID {booking_id} not found'
             }, status=404)
-        
+
         # Verify user owns the booking
         if booking.user.email != user_email:
             return JsonResponse({
                 'success': False,
                 'error': 'You can only cancel your own bookings'
             }, status=403)
-        
+
         # Check if booking can be cancelled
         if not booking.can_cancel():
             return JsonResponse({
                 'success': False,
                 'error': 'This booking cannot be cancelled (either already cancelled or in the past)'
             }, status=400)
-        
+
         # Cancellation policy: cancellation remains possible before start,
         # but late cancellation (within 3 hours) is recorded as a penalty.
         time_until_booking = booking.start_time - timezone.now()
@@ -568,11 +568,11 @@ def api_cancel_booking(request):
                 f' Late cancellation recorded (less than {CANCELLATION_NOTICE_HOURS} hours notice). '
                 f'Total late cancellations: {booking.user.late_cancellation_count}.'
             )
-        
+
         # Cancel the booking
         booking.status = 'cancelled'
         booking.save()
-        
+
         return JsonResponse({
             'success': True,
             'message': (
@@ -593,7 +593,7 @@ def api_cancel_booking(request):
             'late_cancellation': late_cancellation,
             'warning_issued': warning_issued
         })
-    
+
     except json.JSONDecodeError:
         return JsonResponse({
             'success': False,
@@ -615,7 +615,7 @@ def api_cancel_booking(request):
 def api_get_booking_rules(request):
     try:
         rule = BookingRule.objects.filter(is_active=True).first()
-        
+
         if not rule:
             return JsonResponse({
                 'success': True,
@@ -630,7 +630,7 @@ def api_get_booking_rules(request):
                     'booking_end_time': '20:30'
                 }
             })
-        
+
         return JsonResponse({
             'success': True,
             'rules': {
@@ -645,7 +645,7 @@ def api_get_booking_rules(request):
                 'booking_end_time': rule.booking_end_time.strftime('%H:%M')
             }
         })
-    
+
     except Exception as e:
         return JsonResponse({
             'success': False,
@@ -658,16 +658,16 @@ def api_get_booking_rules(request):
 def api_search_rooms(request):
     try:
         query = request.GET.get('query', '').lower()
-        
+
         if not query:
             return JsonResponse({
                 'success': False,
                 'error': 'query parameter is required'
             }, status=400)
-        
+
         # Simple keyword-based search
         rooms = Room.objects.filter(is_available=True)
-        
+
         # Search in name, room_number, description, equipment
         rooms = rooms.filter(
             Q(name__icontains=query) |
@@ -676,7 +676,7 @@ def api_search_rooms(request):
             Q(equipment__icontains=query) |
             Q(room_type__icontains=query)
         )
-        
+
         # Serialize results
         rooms_data = []
         for room in rooms[:10]:  # Limit to top 10 results
@@ -689,14 +689,14 @@ def api_search_rooms(request):
                 'description': room.description,
                 'equipment': room.equipment
             })
-        
+
         return JsonResponse({
             'success': True,
             'query': query,
             'count': len(rooms_data),
             'rooms': rooms_data
         })
-    
+
     except Exception as e:
         return JsonResponse({
             'success': False,

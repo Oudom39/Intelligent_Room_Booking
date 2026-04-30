@@ -72,7 +72,7 @@ class User(AbstractUser):
 
     phone_number = models.CharField(
         'Phone Number',
-        max_length=20, 
+        max_length=20,
         help_text='Format: +999999999 or 999-999-9999',
         blank=True
     )
@@ -161,7 +161,7 @@ class User(AbstractUser):
     def get_lecturer_display_id(self):
         """Return lecturer ID for templates that use the newer terminology."""
         return self.get_student_display_id()
-    
+
     def get_phone_display(self):
         """Return phone number or default"""
         return self.phone_number or "000-000-0000"

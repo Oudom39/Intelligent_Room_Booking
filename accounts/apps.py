@@ -8,4 +8,4 @@ class AccountsConfig(AppConfig):
     def ready(self):
         # Register signal handlers for profile image file lifecycle.
         from . import signals  # noqa: F401
-    
+

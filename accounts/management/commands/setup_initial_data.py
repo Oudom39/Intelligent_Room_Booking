@@ -13,11 +13,11 @@ class Command(BaseCommand):
             user_group, created = Group.objects.get_or_create(name='User')
             if created:
                 self.stdout.write(self.style.SUCCESS('Created User group'))
-            
+
             admin_group, created = Group.objects.get_or_create(name='Admin')
             if created:
                 self.stdout.write(self.style.SUCCESS('Created Admin group'))
-            
+
             # Create admin account
             admin_email = 'admin@rupp.edu.kh'
             if not User.objects.filter(email=admin_email).exists():
@@ -36,7 +36,7 @@ class Command(BaseCommand):
                 admin_user.is_superuser = True
                 admin_user.is_admin = True
                 admin_user.save()
-                
+
                 self.stdout.write(
                     self.style.SUCCESS(
                         f'Created admin account: {admin_email} / password: admin123'
@@ -46,7 +46,7 @@ class Command(BaseCommand):
                 self.stdout.write(
                     self.style.WARNING(f'Admin account {admin_email} already exists')
                 )
-            
+
             # Create test user
             user_email = 'student@rupp.edu.kh'
             if not User.objects.filter(email=user_email).exists():
@@ -62,7 +62,7 @@ class Command(BaseCommand):
                 )
                 test_user.groups.add(user_group)
                 test_user.save()
-                
+
                 self.stdout.write(
                     self.style.SUCCESS(
                         f'Created test user: {user_email} / password: student123'
@@ -72,7 +72,7 @@ class Command(BaseCommand):
                 self.stdout.write(
                     self.style.WARNING(f'Test user {user_email} already exists')
                 )
-            
+
             # Create additional test users
             test_users = [
                 {
@@ -96,7 +96,7 @@ class Command(BaseCommand):
                     'department': 'Business Administration'
                 }
             ]
-            
+
             for user_data in test_users:
                 if not User.objects.filter(email=user_data['email']).exists():
                     new_user = User.objects.create_user(**user_data)
@@ -105,11 +105,11 @@ class Command(BaseCommand):
                     self.stdout.write(
                         self.style.SUCCESS(f'Created test user: {user_data["email"]}')
                     )
-            
+
             self.stdout.write(
                 self.style.SUCCESS('✅ Setup completed successfully!')
             )
-            
+
         except Exception as e:
             self.stdout.write(
                 self.style.ERROR(f'❌ Error during setup: {str(e)}')

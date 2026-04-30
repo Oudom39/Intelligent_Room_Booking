@@ -23,37 +23,37 @@ class RoomOccupiedTimeRuleInline(admin.TabularInline):
 # @admin.register(CustomUser)
 class CustomUserAdmin(UserAdmin):
     """Admin configuration for CustomUser"""
-    
+
     # Remove 'is_admin' and replace with appropriate fields
     list_display = (
-        'username', 
-        'email', 
-        'get_full_name', 
-        'user_type',  
-        'is_approved', 
-        'is_active', 
+        'username',
+        'email',
+        'get_full_name',
+        'user_type',
+        'is_approved',
+        'is_active',
         'date_joined'
     )
-    
+
     list_filter = (
-        'user_type',  
-        'is_approved', 
-        'is_active', 
+        'user_type',
+        'is_approved',
+        'is_active',
         'is_superuser',
         'date_joined'
     )
-    
+
     search_fields = ('username', 'email', 'first_name', 'last_name', 'student_id')
-    
+
     readonly_fields = ('date_joined', 'last_login', 'created_at', 'updated_at')
-    
+
     # Customize the fieldsets to include new fields
     fieldsets = UserAdmin.fieldsets + (
         ('Additional Info', {
             'fields': (
-                'user_type', 
-                'student_id', 
-                'phone_number', 
+                'user_type',
+                'student_id',
+                'phone_number',
                 'department',
                 'is_approved',
                 'max_concurrent_bookings'
@@ -64,13 +64,13 @@ class CustomUserAdmin(UserAdmin):
             'classes': ('collapse',)
         }),
     )
-    
+
     add_fieldsets = UserAdmin.add_fieldsets + (
         ('Additional Info', {
             'fields': (
-                'user_type', 
-                'student_id', 
-                'phone_number', 
+                'user_type',
+                'student_id',
+                'phone_number',
                 'department',
                 'is_approved'
             )
@@ -83,7 +83,7 @@ class CustomUserAdmin(UserAdmin):
 @admin.register(Room)
 class RoomAdmin(admin.ModelAdmin):
     """Admin configuration for Room"""
-    
+
     def room_image_thumb(self, obj):
         if obj.image:
             return format_html('<img src="{}" style="height:48px; width:auto; border-radius:6px; object-fit:cover;" />', obj.image.url)
@@ -128,7 +128,7 @@ class RoomAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
-    
+
     def is_bookable_status(self, obj):
         """Display bookable status with color coding"""
         if obj.is_bookable():
@@ -160,37 +160,37 @@ class RoomOccupiedTimeRuleAdmin(admin.ModelAdmin):
 @admin.register(Booking)
 class BookingAdmin(admin.ModelAdmin):
     """Admin configuration for Booking"""
-    
+
     list_display = (
-        'room', 
-        'user', 
-        'start_time', 
-        'end_time', 
+        'room',
+        'user',
+        'start_time',
+        'end_time',
         'status',
         'duration_display',
         'is_active_status'
     )
-    
+
     list_filter = (
-        'status', 
+        'status',
         'room__room_type',
         'start_time',
         'created_at'
     )
-    
+
     search_fields = (
-        'user__username', 
-        'user__first_name', 
+        'user__username',
+        'user__first_name',
         'user__last_name',
-        'room__name', 
+        'room__name',
         'room__room_number',
         'purpose'
     )
-    
+
     readonly_fields = ('created_at', 'updated_at', 'duration_hours')
-    
+
     date_hierarchy = 'start_time'
-    
+
     fieldsets = (
         ('Booking Details', {
             'fields': ('user', 'room', 'start_time', 'end_time')
@@ -206,12 +206,12 @@ class BookingAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
-    
+
     def duration_display(self, obj):
         """Display booking duration in hours"""
         return f"{obj.duration_hours:.1f}h"
     duration_display.short_description = 'Duration'
-    
+
     def is_active_status(self, obj):
         """Display if booking is currently active"""
         if obj.is_available():
@@ -223,29 +223,29 @@ class BookingAdmin(admin.ModelAdmin):
                 '<span style="color: gray;">○ Inactive</span>'
             )
     is_active_status.short_description = 'Active'
-    
+
     def get_queryset(self, request):
         return super().get_queryset(request).select_related('user', 'room')
 
 @admin.register(BookingRule)
 class BookingRuleAdmin(admin.ModelAdmin):
     """Admin configuration for BookingRule"""
-    
+
     list_display = (
-        'name', 
+        'name',
         'max_duration_hours',
         "daily_booking_limit",
         "weekly_booking_limit",
         'max_advance_days',
         'is_active'
     )
-    
+
     list_filter = ('is_active', 'created_at')
-    
+
     search_fields = ('name',)
-    
+
     readonly_fields = ('created_at', 'updated_at')
-    
+
     fieldsets = (
         ('Rule Name', {
             'fields': ('name', 'is_active')
@@ -253,7 +253,7 @@ class BookingRuleAdmin(admin.ModelAdmin):
         ('Booking Limits', {
             'fields': (
                 'max_duration_hours',
-                'daily_booking_limit', 
+                'daily_booking_limit',
                 'weekly_booking_limit',
             )
         }),
@@ -274,28 +274,28 @@ class BookingRuleAdmin(admin.ModelAdmin):
 @admin.register(Announcement)
 class AnnouncementAdmin(admin.ModelAdmin):
     """Admin configuration for Announcement"""
-    
+
     list_display = (
-        'title', 
-        'announcement_type', 
+        'title',
+        'announcement_type',
         'priority',
         'is_active',
         'is_visible_status',
         'created_by',
         'created_at'
     )
-    
+
     list_filter = (
-        'announcement_type', 
-        'priority', 
+        'announcement_type',
+        'priority',
         'is_active',
         'created_at'
     )
-    
+
     search_fields = ('title', 'content')
-    
+
     readonly_fields = ('created_at', 'updated_at')
-    
+
     fieldsets = (
         ('Announcement Content', {
             'fields': ('title', 'content')
@@ -311,7 +311,7 @@ class AnnouncementAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
-    
+
     def is_visible_status(self, obj):
         """Display visibility status"""
         if obj.is_visible():
@@ -323,10 +323,10 @@ class AnnouncementAdmin(admin.ModelAdmin):
                 '<span style="color: red; font-weight: bold;">🚫 Hidden</span>'
             )
     is_visible_status.short_description = 'Visible'
-    
+
     def save_model(self, request, obj, form, change):
         """Auto-set created_by field"""
-        if not change: 
+        if not change:
             obj.created_by = request.user
         super().save_model(request, obj, form, change)
 

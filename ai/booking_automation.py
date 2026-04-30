@@ -266,7 +266,7 @@ class BookingAutomation:
             if end_dt <= start_dt:
                 end_dt += timedelta(days=1)
 
-        except Exception as e:
+        except Exception:
             return {
                 "success": False,
                 "error": "Invalid date/time format"

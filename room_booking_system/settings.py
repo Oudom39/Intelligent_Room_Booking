@@ -36,7 +36,7 @@ INSTALLED_APPS = [
     # is not present in the environment. Re-enable when the `chatbot` package
     # is available and installed.
     # 'chatbot.apps.ChatbotConfig',  # AI Chatbot with Semantic Kernel (Django-integrated)
-    
+
 ]
 
 # Enable chatbot app only if importable to avoid startup errors when it's not installed
@@ -185,7 +185,7 @@ ACCOUNT_LOGOUT_REDIRECT_URL = '/accounts/login/'
 # Email backend (from .env, fallback to console for dev)
 EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
 EMAIL_HOST = config('EMAIL_HOST', default=None)
-EMAIL_PORT = config('EMAIL_PORT', default=None, cast=int)
+EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
 EMAIL_HOST_USER = config('EMAIL_HOST_USER', default=None)
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default=None)
 EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
@@ -271,8 +271,13 @@ TELEGRAM_BOT_TOKEN = config('TELEGRAM_BOT_TOKEN', default=None)
 
 # List of admin Telegram chat IDs (comma-separated in .env)
 TELEGRAM_ADMIN_CHAT_IDS = [
-    chat_id.strip() for chat_id in 
+    chat_id.strip() for chat_id in
     config('TELEGRAM_ADMIN_CHAT_IDS', default='').split(',')
     if chat_id.strip()
 ]
+
+# Feature flag: enable AI subsystems (vector DB, RAG, chatbot)
+# Set to 'True' in environment to enable AI features; default is False to allow
+# running migrations and Django management commands without optional AI deps.
+AI_ENABLED = config('AI_ENABLED', default=False, cast=bool)
 

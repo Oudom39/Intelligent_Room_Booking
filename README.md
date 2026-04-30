@@ -57,8 +57,7 @@ streamlit run dashboard_analytics.py
 Or use the provided helper on Windows:
 
 ```powershell
-.\
-un_dashboard.bat
+.\run_dashboard.bat
 ```
 
 ## Docker / Production
@@ -100,9 +99,9 @@ git push origin main
 ```
 
 ### GitHub Actions Workflows
-- `.github/workflows/dev.yml` - Development CI/CD
-- `.github/workflows/staging.yml` - Staging CI/CD with security scans
-- `.github/workflows/production.yml` - Production CI/CD with full validation
+- `.github/workflows/ci.yml` - Main CI pipeline for tests and linting
+- `.github/workflows/quality.yml` - Security and coverage checks
+- `.github/workflows/cd.yml` - Tag-driven Docker image build and push workflow
 
 **📚 For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md)**
 
@@ -111,6 +110,7 @@ Configure in **Settings > Secrets and variables > Actions**:
 - `DEV_DEEPSEEK_API_KEY`, `DEV_GROQ_API_KEY`, `DEV_APP_URL`
 - `STAGING_*` equivalents + `DOCKER_USERNAME`, `DOCKER_PASSWORD`
 - `PROD_APP_URL` and production credentials
+- Release secrets for CD: `DOCKER_USERNAME`, `DOCKER_PASSWORD`
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for complete setup guide.
 

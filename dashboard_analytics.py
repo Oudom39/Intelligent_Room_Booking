@@ -115,7 +115,7 @@ def get_booking_data(start_date, end_date):
         ).select_related('room', 'user')
     else:
         bookings = Booking.objects.all().select_related('room', 'user')
-    
+
     return list(bookings.values(
         'id', 'room__name', 'room__room_number', 'room__capacity',
         'start_time', 'end_time', 'status', 'user__email'
@@ -199,17 +199,17 @@ if not df_bookings.empty:
     # Calculate bookings per room
     room_bookings = df_bookings.groupby(['room__name', 'room__room_number']).size().reset_index(name='booking_count')
     room_bookings['room_label'] = room_bookings['room__name'] + ' (' + room_bookings['room__room_number'] + ')'
-    
+
     # Calculate occupancy rate
     total_bookings_count = room_bookings['booking_count'].sum()
     room_bookings['occupancy_rate'] = (room_bookings['booking_count'] / total_bookings_count * 100).round(2)
-    
+
     # Sort by occupancy rate
     room_bookings = room_bookings.sort_values('occupancy_rate', ascending=True)
-    
+
     # Create bar chart
     fig_occupancy = go.Figure()
-    
+
     fig_occupancy.add_trace(go.Bar(
         y=room_bookings['room_label'],
         x=room_bookings['occupancy_rate'],
@@ -224,7 +224,7 @@ if not df_bookings.empty:
         ),
         hovertemplate='<b>%{y}</b><br>Occupancy Rate: %{x:.1f}%<br><extra></extra>'
     ))
-    
+
     fig_occupancy.update_layout(
         title=f"Room Occupancy Rate - {time_range}",
         xaxis_title="Occupancy Rate (%)",
@@ -233,9 +233,9 @@ if not df_bookings.empty:
         showlegend=False,
         hovermode='y unified'
     )
-    
+
     st.plotly_chart(fig_occupancy, use_container_width=True)
-    
+
     # Show detailed table
     with st.expander("📋 View Detailed Room Statistics"):
         display_df = room_bookings[['room_label', 'booking_count', 'occupancy_rate']].copy()
@@ -255,15 +255,15 @@ st.markdown("*Identifies the busiest hours of the day and days of the week*")
 
 if not df_bookings.empty:
     col1, col2 = st.columns(2)
-    
+
     with col1:
         st.subheader("Hourly Booking Distribution")
         # Hourly analysis
         hourly_bookings = df_bookings.groupby('hour').size().reset_index(name='booking_count')
-        
+
         # Create line chart
         fig_hourly = go.Figure()
-        
+
         fig_hourly.add_trace(go.Scatter(
             x=hourly_bookings['hour'],
             y=hourly_bookings['booking_count'],
@@ -275,7 +275,7 @@ if not df_bookings.empty:
             fillcolor='rgba(102, 126, 234, 0.2)',
             hovertemplate='<b>Hour: %{x}:00</b><br>Bookings: %{y}<extra></extra>'
         ))
-        
+
         # Highlight peak hour
         peak_hour = hourly_bookings.loc[hourly_bookings['booking_count'].idxmax()]
         fig_hourly.add_annotation(
@@ -290,7 +290,7 @@ if not df_bookings.empty:
             bgcolor="#ff6b6b",
             font=dict(color="white", size=12)
         )
-        
+
         fig_hourly.update_layout(
             xaxis_title="Hour of Day",
             yaxis_title="Number of Bookings",
@@ -298,11 +298,11 @@ if not df_bookings.empty:
             height=400,
             hovermode='x unified'
         )
-        
+
         st.plotly_chart(fig_hourly, use_container_width=True)
-        
+
         st.info(f"🔥 **Peak Hour:** {int(peak_hour['hour'])}:00 - {int(peak_hour['hour'])+1}:00 with **{int(peak_hour['booking_count'])}** bookings")
-    
+
     with col2:
         st.subheader("Day of Week Distribution")
         # Day of week analysis
@@ -310,9 +310,9 @@ if not df_bookings.empty:
         day_bookings = df_bookings.groupby('day_of_week').size().reset_index(name='booking_count')
         day_bookings['day_of_week'] = pd.Categorical(day_bookings['day_of_week'], categories=day_order, ordered=True)
         day_bookings = day_bookings.sort_values('day_of_week')
-        
+
         fig_daily = go.Figure()
-        
+
         fig_daily.add_trace(go.Bar(
             x=day_bookings['day_of_week'],
             y=day_bookings['booking_count'],
@@ -325,27 +325,27 @@ if not df_bookings.empty:
             textposition='auto',
             hovertemplate='<b>%{x}</b><br>Bookings: %{y}<extra></extra>'
         ))
-        
+
         fig_daily.update_layout(
             xaxis_title="Day of Week",
             yaxis_title="Number of Bookings",
             height=400
         )
-        
+
         st.plotly_chart(fig_daily, use_container_width=True)
-        
+
         peak_day = day_bookings.loc[day_bookings['booking_count'].idxmax()]
         st.info(f"🔥 **Busiest Day:** {peak_day['day_of_week']} with **{int(peak_day['booking_count'])}** bookings")
-    
+
     # Heatmap: Day of Week vs Hour
     st.subheader("📅 Booking Heatmap: Day × Hour")
-    
+
     heatmap_data = df_bookings.groupby(['day_of_week', 'hour']).size().reset_index(name='booking_count')
     heatmap_pivot = heatmap_data.pivot(index='day_of_week', columns='hour', values='booking_count').fillna(0)
-    
+
     # Reorder days
     heatmap_pivot = heatmap_pivot.reindex(day_order)
-    
+
     fig_heatmap = go.Figure(data=go.Heatmap(
         z=heatmap_pivot.values,
         x=heatmap_pivot.columns,
@@ -357,16 +357,16 @@ if not df_bookings.empty:
         hovertemplate='<b>%{y}</b><br>Hour: %{x}:00<br>Bookings: %{z}<extra></extra>',
         colorbar=dict(title="Bookings")
     ))
-    
+
     fig_heatmap.update_layout(
         xaxis_title="Hour of Day",
         yaxis_title="Day of Week",
         height=400,
         xaxis=dict(tickmode='linear', tick0=0, dtick=1)
     )
-    
+
     st.plotly_chart(fig_heatmap, use_container_width=True)
-    
+
 else:
     st.info("No booking data available for the selected time range.")
 
@@ -384,7 +384,7 @@ if not df_bookings.empty:
         ["Daily", "Weekly", "Monthly"],
         horizontal=True
     )
-    
+
     if view_type == "Daily":
         # Daily utilization
         daily_util = df_bookings.groupby('date').agg({
@@ -392,9 +392,9 @@ if not df_bookings.empty:
         }).reset_index()
         daily_util.columns = ['date', 'rooms_booked']
         daily_util['utilization_rate'] = (daily_util['rooms_booked'] / total_rooms * 100).round(2)
-        
+
         fig_util = go.Figure()
-        
+
         fig_util.add_trace(go.Scatter(
             x=daily_util['date'],
             y=daily_util['utilization_rate'],
@@ -406,22 +406,22 @@ if not df_bookings.empty:
             fillcolor='rgba(16, 185, 129, 0.2)',
             hovertemplate='<b>%{x}</b><br>Utilization: %{y:.1f}%<br>Rooms Booked: ' + daily_util['rooms_booked'].astype(str) + f'/{total_rooms}<extra></extra>'
         ))
-        
+
         fig_util.update_layout(
-            title=f"Daily Room Utilization Rate",
+            title="Daily Room Utilization Rate",
             xaxis_title="Date",
             yaxis_title="Utilization Rate (%)",
             height=450,
             hovermode='x unified',
             yaxis=dict(range=[0, 100])
         )
-        
+
         st.plotly_chart(fig_util, use_container_width=True)
-        
+
         avg_util = daily_util['utilization_rate'].mean()
         max_util = daily_util['utilization_rate'].max()
         max_util_date = daily_util.loc[daily_util['utilization_rate'].idxmax(), 'date']
-        
+
         col1, col2, col3 = st.columns(3)
         with col1:
             st.metric("Average Daily Utilization", f"{avg_util:.1f}%")
@@ -429,7 +429,7 @@ if not df_bookings.empty:
             st.metric("Peak Utilization", f"{max_util:.1f}%")
         with col3:
             st.metric("Peak Date", max_util_date.strftime('%Y-%m-%d'))
-            
+
     elif view_type == "Weekly":
         # Weekly utilization
         df_bookings['week'] = df_bookings['start_time'].dt.to_period('W').astype(str)
@@ -438,9 +438,9 @@ if not df_bookings.empty:
         }).reset_index()
         weekly_util.columns = ['week', 'rooms_booked']
         weekly_util['utilization_rate'] = (weekly_util['rooms_booked'] / total_rooms * 100).round(2)
-        
+
         fig_util = go.Figure()
-        
+
         fig_util.add_trace(go.Bar(
             x=weekly_util['week'],
             y=weekly_util['utilization_rate'],
@@ -454,17 +454,17 @@ if not df_bookings.empty:
             textposition='auto',
             hovertemplate='<b>Week: %{x}</b><br>Utilization: %{y:.1f}%<extra></extra>'
         ))
-        
+
         fig_util.update_layout(
-            title=f"Weekly Room Utilization Rate",
+            title="Weekly Room Utilization Rate",
             xaxis_title="Week",
             yaxis_title="Utilization Rate (%)",
             height=450,
             yaxis=dict(range=[0, 100])
         )
-        
+
         st.plotly_chart(fig_util, use_container_width=True)
-        
+
     else:  # Monthly
         # Monthly utilization
         df_bookings['month'] = df_bookings['start_time'].dt.to_period('M').astype(str)
@@ -473,9 +473,9 @@ if not df_bookings.empty:
         }).reset_index()
         monthly_util.columns = ['month', 'rooms_booked']
         monthly_util['utilization_rate'] = (monthly_util['rooms_booked'] / total_rooms * 100).round(2)
-        
+
         fig_util = go.Figure()
-        
+
         fig_util.add_trace(go.Scatter(
             x=monthly_util['month'],
             y=monthly_util['utilization_rate'],
@@ -487,17 +487,17 @@ if not df_bookings.empty:
             fillcolor='rgba(139, 92, 246, 0.2)',
             hovertemplate='<b>%{x}</b><br>Utilization: %{y:.1f}%<extra></extra>'
         ))
-        
+
         fig_util.update_layout(
-            title=f"Monthly Room Utilization Rate",
+            title="Monthly Room Utilization Rate",
             xaxis_title="Month",
             yaxis_title="Utilization Rate (%)",
             height=450,
             yaxis=dict(range=[0, 100])
         )
-        
+
         st.plotly_chart(fig_util, use_container_width=True)
-        
+
 else:
     st.info("No booking data available for the selected time range.")
 

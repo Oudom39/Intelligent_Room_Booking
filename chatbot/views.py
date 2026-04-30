@@ -30,7 +30,7 @@ def chat_page_get(request):
     if request.method == "GET":
         # Redirect GET requests to the main chatbot UI
         return redirect('chatbot:index')
-    
+
     elif request.method == "POST":
         # Handle POST: process chat message
         try:
@@ -41,7 +41,7 @@ def chat_page_get(request):
                 'error': str(e),
                 'message': 'Chat endpoint error'
             }, status=500)
-    
+
     else:
         # Other methods not allowed
         return JsonResponse({
